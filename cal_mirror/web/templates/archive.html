@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Archive{% endblock %}
+{% block content %}
+<h1>Archive</h1>
+{% if message %}<p>{{ message }}</p>{% endif %}
+{% if not destinations %}
+<p>Add an archive destination in <a href="/settings">Settings</a> first.</p>
+{% else %}
+<form method="post" action="/archive">
+  <label>Cutoff <input type="date" name="cutoff"></label>
+  <label>Destination
+    <select name="destination">
+      {% for d in destinations %}<option value="{{ d }}">{{ d }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit">Start archive</button>
+</form>
+{% endif %}
+<table>
+  <tr><th>Id</th><th>Cutoff</th><th>Destination</th><th>State</th></tr>
+  {% for r in requests %}
+  <tr>
+    <td><a href="/archive/{{ r.id }}">{{ r.id }}</a></td>
+    <td>{{ r.params.get("cutoff", "") }}</td>
+    <td>{{ r.params.get("destination", "") }}</td>
+    <td>{{ r.state }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

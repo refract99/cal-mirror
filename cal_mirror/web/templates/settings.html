@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/settings">
+  <p><label>Sync interval (minutes)
+    <input type="text" name="sync_interval_minutes" value="{{ values.sync_interval_minutes }}"></label></p>
+  <p><label>ntfy server
+    <input type="text" name="ntfy_server" value="{{ values.ntfy_server }}"></label></p>
+  <p><label>ntfy topic
+    <input type="text" name="ntfy_topic" value="{{ values.ntfy_topic }}"></label></p>
+  <p><label>Archive destinations (one path per line)
+    <textarea name="archive_destinations" rows="4">{{ values.archive_destinations }}</textarea></label></p>
+  <p><label>Owner email
+    <input type="text" name="owner_email" value="{{ values.owner_email }}"></label></p>
+  <p><label>Time zone
+    <input type="text" name="time_zone" value="{{ values.time_zone }}"></label></p>
+  <p><label>Web URL
+    <input type="text" name="web_url" value="{{ values.web_url }}"></label></p>
+  <p><label><input type="checkbox" name="check_no_link"{% if checks.check_no_link %} checked{% endif %}>
+    Check for a missing call link</label></p>
+  <p><label><input type="checkbox" name="check_hours"{% if checks.check_hours %} checked{% endif %}>
+    Check for meetings outside allowed hours</label></p>
+  <fieldset>
+    <legend>Allowed hours (HH:MM-HH:MM, blank for none)</legend>
+    {% for day in days %}
+    <p><label>{{ day }}
+      <input type="text" name="allowed_hours_{{ loop.index0 }}" value="{{ values['allowed_hours_' ~ loop.index0] }}"></label></p>
+    {% endfor %}
+  </fieldset>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

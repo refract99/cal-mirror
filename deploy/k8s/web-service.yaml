@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cal-mirror-web
+  labels:
+    app.kubernetes.io/name: cal-mirror
+    app.kubernetes.io/component: web
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    app.kubernetes.io/name: cal-mirror
+    app.kubernetes.io/component: web
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8443
+      protocol: TCP

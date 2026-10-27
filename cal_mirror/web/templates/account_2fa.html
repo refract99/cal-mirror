@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Two-factor sign-in{% endblock %}
+{% block content %}
+<h1>Two-factor sign-in</h1>
+{% if error %}<p>{{ error }}</p>{% endif %}
+{% if setup or confirming %}
+{% if setup %}
+<p>Add this to your authenticator app and keep the recovery codes. They are shown once.</p>
+<p>URI: <code>{{ uri }}</code></p>
+<p>Secret: <code>{{ secret }}</code></p>
+<ul>
+  {% for c in codes %}<li><code>{{ c }}</code></li>
+  {% endfor %}
+</ul>
+{% endif %}
+<form method="post">
+  <input type="hidden" name="action" value="confirm">
+  <label>Code <input type="text" name="code" autocomplete="one-time-code" required></label>
+  <button type="submit">Confirm</button>
+</form>
+{% elif enabled %}
+<p>Two-factor sign-in is on.</p>
+<form method="post">
+  <input type="hidden" name="action" value="disable">
+  <label>Code <input type="text" name="code" autocomplete="one-time-code" required></label>
+  <button type="submit">Disable</button>
+</form>
+{% else %}
+<p>Two-factor sign-in is off.</p>
+<form method="post">
+  <input type="hidden" name="action" value="enable">
+  <button type="submit">Enable</button>
+</form>
+{% endif %}
+{% endblock %}

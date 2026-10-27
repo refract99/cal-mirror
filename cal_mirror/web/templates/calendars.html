@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Calendars{% endblock %}
+{% block content %}
+<h1>Calendars</h1>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if not calendars %}
+<p>{{ empty_message }}</p>
+{% else %}
+<form method="post" action="/calendars">
+  <table>
+    <thead>
+      <tr><th>Calendar</th><th>Main</th><th>Secondary</th><th>Default</th></tr>
+    </thead>
+    <tbody>
+    {% for c in calendars %}
+      <tr>
+        <td>{{ c.summary or c.id }}</td>
+        <td><input type="radio" name="main" value="{{ c.id }}"{% if c.id == main %} checked{% endif %}></td>
+        <td><input type="checkbox" name="secondary" value="{{ c.id }}"{% if c.id in secondary %} checked{% endif %}></td>
+        <td><input type="radio" name="default" value="{{ c.id }}"{% if c.id == default %} checked{% endif %}></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <button type="submit">Save</button>
+</form>
+{% endif %}
+{% endblock %}

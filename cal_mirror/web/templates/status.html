@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Status{% endblock %}
+{% block content %}
+<h1>Status</h1>
+{% if show_notice %}
+<section id="notice">
+  <h2>Notice</h2>
+  {% if matched %}
+  <ul>
+    {% for n in matched %}
+    <li>{{ n.title }}: {{ n.start }} ({{ n.check }})</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>That notice is no longer in the recent list.</p>
+  {% endif %}
+</section>
+{% endif %}
+<section id="sync">
+  <h2>Sync</h2>
+  <p>Last good sync: {{ last_good_sync }}</p>
+  <p>Current failure: {{ failure }}</p>
+  {% if token_ok %}
+  <p>Google token: ok</p>
+  {% else %}
+  <p><a href="/google">Google token rejected: reconnect</a></p>
+  {% endif %}
+</section>
+<section id="counts">
+  <h2>Counts</h2>
+  {% if counts %}
+  <ul>
+    {% for key, value in counts %}
+    <li>{{ key }}: {{ value }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>No counts yet.</p>
+  {% endif %}
+</section>
+<section id="placements">
+  <h2>Default placements</h2>
+  {% if placements %}
+  <table>
+    <thead>
+      <tr><th>When</th><th>Title</th><th>Organizer</th><th>Guest domains</th><th>Calendar</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for p in placements %}
+      <tr>
+        <td>{{ p.at }}</td>
+        <td>{{ p.title }}</td>
+        <td>{{ p.organizer_email }}</td>
+        <td>{{ p.guest_domains }}</td>
+        <td>{{ p.calendar_id }}</td>
+        <td><a href="/rules?from_placement={{ p.id }}">Make a rule</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No default placements yet.</p>
+  {% endif %}
+</section>
+<section id="notices">
+  <h2>Recent notices</h2>
+  {% if notices %}
+  <ul>
+    {% for n in notices %}
+    <li>{{ n.title }}: {{ n.start }} ({{ n.check }})</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>No recent notices.</p>
+  {% endif %}
+</section>
+{% endblock %}

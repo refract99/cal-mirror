@@ -1,0 +1,9 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: cal-mirror-selfsigned
+  labels:
+    app.kubernetes.io/name: cal-mirror
+    app.kubernetes.io/component: web
+spec:
+  selfSigned: {}

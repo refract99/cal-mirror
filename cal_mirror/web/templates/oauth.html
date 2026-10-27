@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Google account{% endblock %}
+{% block content %}
+  <h1>Google account</h1>
+  {% if message %}
+  <p id="oauth-error">{{ message }}</p>
+  <a href="/google/connect">Try again</a>
+  {% else %}
+  <p id="google-state">{{ state }}</p>
+  <a href="/google/connect">{% if state == "Connect" %}Connect Google{% else %}Reconnect Google{% endif %}</a>
+  {% endif %}
+{% endblock %}

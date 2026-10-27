@@ -1,0 +1,10 @@
+FROM python:3.13.16-slim
+COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /bin/uv
+ENV UV_PYTHON_DOWNLOADS=never UV_COMPILE_BYTECODE=1 PYTHONDONTWRITEBYTECODE=1 PATH=/app/.venv/bin:$PATH
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
+COPY cal_mirror/ cal_mirror/
+RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin app
+USER 10001
+CMD ["python", "-m", "cal_mirror.worker"]

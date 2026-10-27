@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Second factor{% endblock %}
+{% block content %}
+<h1>Second factor</h1>
+{% if error %}<p>{{ error }}</p>{% endif %}
+<form method="post">
+  <label>Code or recovery code <input type="text" name="code" autocomplete="one-time-code" required></label>
+  <button type="submit">Sign in</button>
+</form>
+{% endblock %}

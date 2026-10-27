@@ -1,0 +1,55 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cal-mirror
+resources:
+  - issuer-selfsigned.yaml
+  - certificate.yaml
+  - web-deployment.yaml
+  - web-service.yaml
+  - worker-deployment.yaml
+  - networkpolicy-web.yaml
+  - networkpolicy-worker.yaml
+images:
+  - name: cal-mirror-web
+    newName: ghcr.io/refract99/cal-mirror-web
+    newTag: 0.1.0
+  - name: cal-mirror-worker
+    newName: ghcr.io/refract99/cal-mirror-worker
+    newTag: 0.1.0
+configMapGenerator:
+  - name: cal-mirror-settings
+    envs:
+      - settings.properties
+replacements:
+  - source: {kind: ConfigMap, name: cal-mirror-settings, fieldPath: data.HOST_NAME}
+    targets:
+      - select: {kind: Certificate, name: cal-mirror-web}
+        fieldPaths: [spec.dnsNames.0]
+  - source: {kind: ConfigMap, name: cal-mirror-settings, fieldPath: data.TLS_ISSUER_KIND}
+    targets:
+      - select: {kind: Certificate, name: cal-mirror-web}
+        fieldPaths: [spec.issuerRef.kind]
+  - source: {kind: ConfigMap, name: cal-mirror-settings, fieldPath: data.TLS_ISSUER_NAME}
+    targets:
+      - select: {kind: Certificate, name: cal-mirror-web}
+        fieldPaths: [spec.issuerRef.name]
+  - source: {kind: ConfigMap, name: cal-mirror-settings, fieldPath: data.LAN_CIDR}
+    targets:
+      - select: {kind: NetworkPolicy, name: cal-mirror-web}
+        fieldPaths: [spec.ingress.0.from.0.ipBlock.cidr]
+  - source: {kind: ConfigMap, name: cal-mirror-settings, fieldPath: data.VPN_CIDR}
+    targets:
+      - select: {kind: NetworkPolicy, name: cal-mirror-web}
+        fieldPaths: [spec.ingress.0.from.1.ipBlock.cidr]
+  - source: {kind: ConfigMap, name: cal-mirror-settings, fieldPath: data.PG_NAMESPACE}
+    targets:
+      - select: {kind: NetworkPolicy}
+        fieldPaths: [spec.egress.1.to.0.namespaceSelector.matchLabels.kubernetes\.io/metadata\.name]
+  - source: {kind: ConfigMap, name: cal-mirror-settings, fieldPath: data.USB_NODE}
+    targets:
+      - select: {kind: Deployment, name: cal-mirror-worker}
+        fieldPaths: [spec.template.spec.nodeSelector.kubernetes\.io/hostname]
+  - source: {kind: ConfigMap, name: cal-mirror-settings, fieldPath: data.ARCHIVE_HOST_PATH}
+    targets:
+      - select: {kind: Deployment, name: cal-mirror-worker}
+        fieldPaths: [spec.template.spec.volumes.0.hostPath.path]

@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cal-mirror-web
+  labels:
+    app.kubernetes.io/name: cal-mirror
+    app.kubernetes.io/component: web
+spec:
+  secretName: cal-mirror-tls
+  dnsNames:
+    - cal-mirror.example.com
+  issuerRef:
+    kind: Issuer
+    name: cal-mirror-selfsigned

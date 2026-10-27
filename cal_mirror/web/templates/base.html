@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}cal-mirror{% endblock %}</title>
+</head>
+<body>
+  <nav>
+    <a href="/status">Status</a>
+    <a href="/calendars">Calendars</a>
+    <a href="/rules">Rules</a>
+    <a href="/settings">Settings</a>
+    <a href="/archive">Archive</a>
+    <a href="/google">Google</a>
+    <a href="/signout">Sign out</a>
+  </nav>
+  {% block content %}{% endblock %}
+</body>
+</html>

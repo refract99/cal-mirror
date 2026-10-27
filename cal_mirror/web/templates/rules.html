@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Rules{% endblock %}
+{% block content %}
+<h1>Rules</h1>
+{% if message %}<p>{{ message }}</p>{% endif %}
+{% if current %}
+{% if current.state == "pending" %}
+<meta http-equiv="refresh" content="5">
+<p>Counting the copies that would move...</p>
+{% elif current.state == "ready" %}
+<section>
+  <p>{% if moves == 1 %}1 future copy will move{% else %}{{ moves }} future copies will move{% endif %} to another calendar.</p>
+  <ol>
+    {% for r in proposed %}<li>{{ r.kind }}: {{ r.value }} &rarr; {{ r.calendar_id }}</li>
+    {% endfor %}
+  </ol>
+  <form method="post" action="/rules/requests/{{ current.id }}/confirm"><button type="submit">Confirm</button></form>
+  <form method="post" action="/rules/requests/{{ current.id }}/cancel"><button type="submit">Cancel</button></form>
+</section>
+{% elif current.state == "confirmed" %}
+<meta http-equiv="refresh" content="5">
+<p>Moving copies...</p>
+{% elif current.state == "failed" %}
+<p>The rule change failed: {{ error }}</p>
+{% endif %}
+{% endif %}
+{% if placement %}<p>New rule from: {{ placement.title }}</p>{% endif %}
+<form method="post" action="/rules">
+  <input type="hidden" name="count" value="{{ count }}">
+  <table>
+    <tr><th>Kind</th><th>Value</th><th>Calendar</th><th>Position</th><th>Delete</th></tr>
+    {% for row in rows %}
+    {% set i = loop.index0 %}
+    {% set blank = loop.last %}
+    <tr>
+      <td>
+        <select name="kind_{{ i }}">
+          {% if blank %}<option value=""></option>{% endif %}
+          {% for k in kinds %}<option value="{{ k }}"{% if k == row.kind %} selected{% endif %}>{{ k }}</option>
+          {% endfor %}
+        </select>
+      </td>
+      <td><input name="value_{{ i }}" value="{{ row.value }}"></td>
+      <td>
+        <select name="calendar_{{ i }}">
+          {% if blank %}<option value=""></option>{% endif %}
+          {% for c in calendars %}<option value="{{ c }}"{% if c == row.calendar %} selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </td>
+      <td><input type="number" name="position_{{ i }}" value="{{ row.position }}"></td>
+      <td>{% if not blank %}<input type="checkbox" name="delete_{{ i }}" value="1">{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

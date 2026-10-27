@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Archive {{ req.id }}{% endblock %}
+{% block content %}
+<h1>Archive {{ req.id }}</h1>
+<p>Cutoff: {{ req.params.get("cutoff", "") }}</p>
+<p>Destination: {{ req.params.get("destination", "") }}</p>
+{% if req.state == "pending" %}
+<p>Writing the archive and counting...</p>
+{% elif req.state == "ready" %}
+{% if rows %}
+<table>
+  <tr><th>Calendar</th><th>Year</th><th>Events</th></tr>
+  {% for cells, total in rows %}
+  <tr>
+    <td>{% if total %}<strong>{{ cells[0] }}</strong>{% else %}{{ cells[0] }}{% endif %}</td>
+    <td>{{ cells[1] }}</td>
+    <td>{{ cells[2] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No events before the cutoff.</p>
+{% endif %}
+{% if kept_unbounded > 0 %}
+<p id="kept-unbounded">Kept, too large to check: {{ kept_unbounded }} recurring series.</p>
+{% endif %}
+{% if check_ok %}
+<form method="post" action="/archive/{{ req.id }}/confirm">
+  <button type="submit">Confirm delete</button>
+</form>
+{% else %}
+<p>Archive check failed: nothing will be deleted.</p>
+{% endif %}
+<form method="post" action="/archive/{{ req.id }}/cancel">
+  <button type="submit">Cancel</button>
+</form>
+{% elif req.state == "confirmed" %}
+<p>Deleting...</p>
+{% elif req.state == "done" %}
+<p>Archive finished.</p>
+<ul>
+  {% for key, value in extras %}<li>{{ key }}: {{ value }}</li>
+  {% endfor %}
+</ul>
+{% elif req.state == "failed" %}
+<p>Archive failed.</p>
+{% if error %}<p>{{ error }}</p>{% endif %}
+{% elif req.state == "cancelled" %}
+<p>Cancelled. Nothing was deleted.</p>
+{% endif %}
+{% endblock %}
