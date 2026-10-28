@@ -483,3 +483,24 @@ def test_no_default_copies_only_events_a_rule_matches() -> None:
     other = Event(calendar_id="main", id="e2", summary="y", organizer_email="a@b.c")
     assert choose_calendar(boardy, rules, "")[0] == "blocksentience"
     assert choose_calendar(other, rules, "")[0] == ""
+
+
+def test_boardy_only_setup_copies_only_boardy_events_even_when_rule_comes_later():
+    from cal_mirror.model import RULE_ORGANIZER
+
+    store, state, clock, note, calendar = _world(default_calendar="")
+    boardy = state.add_event(
+        "main@x", _timed("Boardy intro", organizer={"email": "boardy@boardy.ai"})
+    )
+    other = state.add_event("main@x", _timed("Other", organizer={"email": "a@b.c"}))
+    run_once(store, calendar, note, clock)
+    assert store.list_links() == []
+    store.save_rules(
+        [Rule(id=1, kind=RULE_ORGANIZER, value="boardy@boardy.ai", calendar_id="home@x")]
+    )
+    store.set_sync_token("main@x", None)
+    store.set_sync_token("work@x", None)
+    store.set_sync_token("home@x", None)
+    run_once(store, calendar, note, clock)
+    assert store.get_link(f"main@x/{boardy['id']}").calendar_id == "home@x"
+    assert store.get_link(f"main@x/{other['id']}") is None
