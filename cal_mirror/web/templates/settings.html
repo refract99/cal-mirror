@@ -3,6 +3,12 @@
 {% block content %}
 <h1>Settings</h1>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if notice %}<p id="sync-notice">{{ notice }}</p>{% endif %}
+<section id="sync-now">
+  <h2>Sync</h2>
+  <p>Syncs run on the interval below. Run one right now:</p>
+  <form method="post" action="/settings/sync-now"><button type="submit">Sync now</button></form>
+</section>
 <form method="post" action="/settings">
   <p><label>Sync interval (minutes)
     <input type="text" name="sync_interval_minutes" value="{{ values.sync_interval_minutes }}"></label></p>

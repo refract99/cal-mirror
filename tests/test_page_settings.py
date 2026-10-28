@@ -40,6 +40,7 @@ class FakeStore:
     def __init__(self) -> None:
         self.settings = START
         self.saved: list[Settings] = []
+        self.meta: dict[str, str] = {}
 
     def get_settings(self) -> Settings:
         return self.settings
@@ -50,6 +51,9 @@ class FakeStore:
 
     def list_calendars(self) -> list:
         return []
+
+    def set_meta(self, key: str, value: str) -> None:
+        self.meta[key] = value
 
 
 def make_client(signed_in: bool = True) -> tuple[TestClient, FakeStore]:
@@ -360,3 +364,22 @@ def test_only_first_failing_rule_shown():
 def test_error_message_is_escaped():
     response, _ = post(ntfy_topic="<b>x</b>")
     assert "&lt;b&gt;x&lt;/b&gt;" in response.text
+
+
+def test_sync_now_sets_the_flag_and_confirms():
+    client, store = make_client()
+    response = client.post("/settings/sync-now")
+    assert (response.status_code, response.headers["location"], store.meta["sync_now"]) == (
+        303,
+        "/settings?synced=1",
+        "1",
+    )
+    assert "Sync requested" in client.get("/settings?synced=1").text
+    assert "Sync now" in client.get("/settings").text
+
+
+def test_header_shows_the_version():
+    from cal_mirror import __version__
+
+    client, _ = make_client()
+    assert f"v{__version__}" in client.get("/settings").text

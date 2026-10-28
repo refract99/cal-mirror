@@ -24,6 +24,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: version
         run: echo "v=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Stamp the version into the image
+        run: |
+          echo "__version__ = \"${{ steps.version.outputs.v }}\"" > cal_mirror/__init__.py
+          sed -i 's/^version = ".*"/version = "${{ steps.version.outputs.v }}"/' pyproject.toml
       - uses: docker/build-push-action@v6
         with:
           context: .

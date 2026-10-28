@@ -403,3 +403,22 @@ def test_one_pass_mirrors_a_busy_secondary_event() -> None:
         if private.get(MARKER_KIND) == KIND_BLOCKED and item.get("status") != "cancelled":
             blocked.append(item)
     assert len(blocked) == 1
+
+
+def test_sync_now_flag_forces_one_extra_sync_and_clears(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = _clock()
+    store = MemoryStore()
+    store.save_settings(Settings(sync_interval_minutes=60))
+    syncs: list[datetime] = []
+    _patch_steps(monkeypatch, syncs, [])
+    passes = {"n": 0}
+    base_sleep, stop = _loop(passes, clock, 4)
+
+    def sleep(seconds: float) -> None:
+        if passes["n"] == 1:
+            store.set_meta("sync_now", "1")
+        base_sleep(seconds)
+
+    serve(store, lambda: object(), lambda _settings: RecordingNotifier(), clock, sleep, stop)
+    assert syncs == [NOW, NOW + timedelta(seconds=30)]
+    assert store.get_meta("sync_now") == ""

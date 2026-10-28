@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
-from cal_mirror.model import Settings
+from cal_mirror.model import SYNC_NOW, Settings
 from cal_mirror.ports import Store
 from cal_mirror.web.deps import current_user, get_store, templates
 
@@ -58,7 +58,15 @@ def _values_from_settings(s: Settings) -> dict[str, str]:
 
 
 def _render(request: Request, values, checks, error: str, status_code: int):
-    context = {"values": values, "checks": checks, "error": error, "days": DAYS}
+    context = {
+        "values": values,
+        "checks": checks,
+        "error": error,
+        "days": DAYS,
+        "notice": "Sync requested. The worker starts it within 15 seconds."
+        if request.query_params.get("synced")
+        else "",
+    }
     return templates.TemplateResponse(request, "settings.html", context, status_code=status_code)
 
 
@@ -71,6 +79,15 @@ def show_settings(
     s = store.get_settings()
     checks = {"check_no_link": s.check_no_link, "check_hours": s.check_hours}
     return _render(request, _values_from_settings(s), checks, "", 200)
+
+
+@router.post("/settings/sync-now")
+def sync_now(
+    _user: Annotated[str, Depends(current_user)],
+    store: Annotated[Store, Depends(get_store)],
+) -> RedirectResponse:
+    store.set_meta(SYNC_NOW, "1")
+    return RedirectResponse("/settings?synced=1", status_code=303)
 
 
 @router.post("/settings")

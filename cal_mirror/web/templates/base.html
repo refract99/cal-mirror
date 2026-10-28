@@ -11,7 +11,7 @@
   {% if not hide_nav %}
   <header class="site-header">
     <div class="nav-container">
-      <a href="/status" class="brand">cal-mirror</a>
+      <a href="/status" class="brand">cal-mirror <span class="version">v{{ app_version }}</span></a>
       <nav class="main-nav" aria-label="Main">
         {% for href, label in [("/status", "Status"), ("/calendars", "Calendars"), ("/rules", "Rules"), ("/settings", "Settings"), ("/archive", "Archive"), ("/google", "Google")] %}
         <a href="{{ href }}"{% if path == href %} class="active" aria-current="page"{% endif %}>{{ label }}</a>

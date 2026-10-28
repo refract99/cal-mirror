@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import HTTPException, Request
 from fastapi.templating import Jinja2Templates
 
+from cal_mirror import __version__
 from cal_mirror.ports import Clock, Store
 
 SESSION_COOKIE = "cal_mirror_session"
@@ -29,3 +30,4 @@ def current_user(request: Request) -> str:
 
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+templates.env.globals["app_version"] = __version__

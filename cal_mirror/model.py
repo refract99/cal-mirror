@@ -222,3 +222,5 @@ REQ_CONFIRMED = "confirmed"
 REQ_DONE = "done"
 REQ_FAILED = "failed"
 REQ_CANCELLED = "cancelled"
+
+SYNC_NOW = "sync_now"  # store meta key: the owner asked for a sync now

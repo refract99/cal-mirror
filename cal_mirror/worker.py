@@ -14,7 +14,7 @@ from typing import TextIO
 from cal_mirror.alerts import NtfyNotifier, step_alert
 from cal_mirror.crypto import RedactingFilter, cipher_from_env
 from cal_mirror.google_api import GoogleCalendar, build_service
-from cal_mirror.model import FAIL_DB, AlertState, Failure, Settings
+from cal_mirror.model import FAIL_DB, SYNC_NOW, AlertState, Failure, Settings
 from cal_mirror.ports import (
     Calendar,
     CalendarError,
@@ -214,7 +214,14 @@ def serve(
                 process_requests(store, cal, clock, notifier)
                 step = "sync"
                 interval = max(1, settings.sync_interval_minutes)
-                if last_sync is None or clock.now() >= last_sync + timedelta(minutes=interval):
+                forced = store.get_meta(SYNC_NOW) == "1"
+                if (
+                    forced
+                    or last_sync is None
+                    or clock.now() >= last_sync + timedelta(minutes=interval)
+                ):
+                    if forced:
+                        store.set_meta(SYNC_NOW, "")
                     last_sync = clock.now()
                     run_notifier = _RunNotifier(notifier, hold_failure=db_owner != "")
                     result = run_once(store, cal, run_notifier, clock)

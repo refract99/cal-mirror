@@ -122,6 +122,11 @@ a { color: var(--accent); }
   border-radius: var(--radius-pill);
   background: var(--accent);
 }
+.version {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
 .main-nav {
   display: flex;
   align-items: center;
@@ -159,7 +164,7 @@ a { color: var(--accent); }
 .auth-page .container { max-width: 420px; margin-top: 5vh; }
 
 /* --- Cards & Panels --- */
-.panel, fieldset, #sync, #counts, #placements, #notices {
+.panel, fieldset, #sync, #sync-now, #counts, #placements, #notices {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -343,13 +348,13 @@ td input[type="text"], td input[type="number"], td select {
   border: 1px solid var(--error-border);
 }
 
-#notice, #oauth-error, [role="alert"] {
+#notice, #sync-notice, #oauth-error, [role="alert"] {
   padding: 0.85rem 1rem;
   border-radius: var(--radius-md);
   margin-bottom: 1.25rem;
   font-size: 0.875rem;
 }
-#notice {
+#notice, #sync-notice {
   background-color: var(--success-bg);
   color: var(--success-text);
   border: 1px solid var(--success-border);
