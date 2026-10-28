@@ -104,6 +104,9 @@ def _handle_rules(
         _finish(store, req, REQ_READY, {"moves": len(writes)})
         return
     store.save_rules(proposed)
+    for cid in (settings.main_calendar, *settings.secondary_calendars):
+        if cid:
+            store.set_sync_token(cid, None)
     by_source = {link.source: (link, src) for link, src in copies}
     applied = 0
     try:

@@ -222,6 +222,7 @@ def serve(
                 ):
                     if forced:
                         store.set_meta(SYNC_NOW, "")
+                        _reread_all(store, settings)
                     last_sync = clock.now()
                     run_notifier = _RunNotifier(notifier, hold_failure=db_owner != "")
                     result = run_once(store, cal, run_notifier, clock)
@@ -259,6 +260,13 @@ def serve(
         except ValueError as err:
             _log_failure(step, err)
         sleep(REQUEST_SECONDS)
+
+
+def _reread_all(store: Store, settings: Settings) -> None:
+    """Forget the sync tokens so the next sync re-reads every future event and re-places it."""
+    for cid in (settings.main_calendar, *settings.secondary_calendars):
+        if cid:
+            store.set_sync_token(cid, None)
 
 
 def _required(name: str) -> str:

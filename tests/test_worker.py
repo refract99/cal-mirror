@@ -422,3 +422,21 @@ def test_sync_now_flag_forces_one_extra_sync_and_clears(monkeypatch: pytest.Monk
     serve(store, lambda: object(), lambda _settings: RecordingNotifier(), clock, sleep, stop)
     assert syncs == [NOW, NOW + timedelta(seconds=30)]
     assert store.get_meta("sync_now") == ""
+
+
+def test_sync_now_forgets_sync_tokens_so_every_event_is_replaced(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = _clock()
+    store = MemoryStore()
+    store.save_settings(
+        Settings(sync_interval_minutes=60, main_calendar="m", secondary_calendars=("s",))
+    )
+    store.set_sync_token("m", "tok-m")
+    store.set_sync_token("s", "tok-s")
+    store.set_meta("sync_now", "1")
+    _patch_steps(monkeypatch, [], [])
+    passes = {"n": 0}
+    sleep, stop = _loop(passes, clock, 1)
+    serve(store, lambda: object(), lambda _settings: RecordingNotifier(), clock, sleep, stop)
+    assert (store.get_sync_token("m"), store.get_sync_token("s")) == (None, None)
