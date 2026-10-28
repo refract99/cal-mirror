@@ -172,9 +172,11 @@ def _error_reasons(err: HttpError) -> set[str]:
 
 def _translate(err: HttpError | RefreshError, method: str, *, expired_ok: bool = False):
     if isinstance(err, RefreshError):
-        return CalendarAuthError("Google token rejected")
+        reason = str(err.args[0])[:80] if err.args else ""
+        return CalendarAuthError(f"Google token rejected: {reason}".rstrip(": "))
     status = int(err.resp.status)
-    message = f"Google API {method} failed: HTTP {status}"
+    reasons = ",".join(sorted(_error_reasons(err)))
+    message = f"Google API {method} failed: HTTP {status}" + (f" ({reasons})" if reasons else "")
     if status == 410 and expired_ok:
         return SyncTokenExpired(message)
     if status == 401 or (status == 403 and not _error_reasons(err) & _RATE_REASONS):

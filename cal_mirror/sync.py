@@ -93,8 +93,8 @@ def run_once(store: Store, calendar: Calendar, notifier: Notifier, clock: Clock)
     run = _Run()
     try:
         _execute(store, calendar, notifier, now, run)
-    except CalendarAuthError:
-        log.error("%s", CalendarAuthError.__name__)
+    except CalendarAuthError as exc:
+        log.error("%s: %s", CalendarAuthError.__name__, exc)
         run.failure = FAIL_TOKEN
     except CalendarError as exc:
         log.error("%s", type(exc).__name__)

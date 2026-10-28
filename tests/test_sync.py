@@ -457,3 +457,18 @@ def test_notify_error_is_logged_and_the_run_continues():
     assert store.get_status().failure == ""
     assert store.get_status().last_good_sync == NOW
     _assert_safe(state, [], ())
+
+
+def test_auth_error_names_the_reason() -> None:
+    import json
+
+    import httplib2
+    from googleapiclient.errors import HttpError
+
+    from cal_mirror.google_api import _translate
+
+    body = {"error": {"message": "x", "errors": [{"reason": "accessNotConfigured"}]}}
+    err = HttpError(httplib2.Response({"status": "403"}), json.dumps(body).encode())
+    assert str(_translate(err, "calendarList.list")) == (
+        "Google API calendarList.list failed: HTTP 403 (accessNotConfigured)"
+    )
