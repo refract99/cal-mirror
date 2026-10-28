@@ -123,9 +123,9 @@ def test_archive_pending_stores_the_owned_delete(tmp_path):
     assert req is not None
     assert req.state == REQ_READY
     deletes = req.result["deletes"]
-    assert deletes[0] == ["main@x", "owned"]
-    assert all(d[1].startswith("weekly_") for d in deletes[1:]) and len(deletes) == 27
-    assert req.result["counts"] == {"main@x/2024": 27}
+    assert deletes[:2] == [["main@x", "invited"], ["main@x", "owned"]]
+    assert all(d[1].startswith("weekly_") for d in deletes[2:]) and len(deletes) == 28
+    assert req.result["counts"] == {"main@x/2024": 28}
     assert _delete_writes(state) == []
     assert all(write["sendUpdates"] == "none" for write in state.writes)
 
@@ -152,15 +152,15 @@ def test_archive_confirm_deletes_source_and_linked_copy(tmp_path):
     ready = store.get_request(req_id)
     assert ready is not None
     whole = [d for d in ready.result["deletes"] if not d[1].startswith("weekly_")]
-    assert whole == [["main@x", "owned"], ["work@x", "copy-owned"]]
+    assert whole == [["main@x", "invited"], ["main@x", "owned"], ["work@x", "copy-owned"]]
     _confirm(store, req_id)
     _run(store, calendar, clock, notifier)
     req = store.get_request(req_id)
     assert req is not None
     assert req.state == REQ_DONE
-    assert req.result["deleted"] == 28
+    assert req.result["deleted"] == 29
     whole = [w for w in _delete_writes(state) if not w[1].startswith("weekly_")]
-    assert whole == [("main@x", "owned"), ("work@x", "copy-owned")]
+    assert whole == [("main@x", "invited"), ("main@x", "owned"), ("work@x", "copy-owned")]
     assert all(write["sendUpdates"] == "none" for write in state.writes)
 
 
@@ -223,10 +223,10 @@ def test_archive_confirm_unchanged_deletes_the_owned_event(tmp_path):
     req = store.get_request(req_id)
     assert req is not None
     assert req.state == REQ_DONE
-    assert req.result["deleted"] == 27
+    assert req.result["deleted"] == 28
     writes = _delete_writes(state)
-    assert writes[0] == ("main@x", "owned")
-    assert all(w[1].startswith("weekly_") for w in writes[1:])
+    assert writes[:2] == [("main@x", "invited"), ("main@x", "owned")]
+    assert all(w[1].startswith("weekly_") for w in writes[2:])
     assert all(write["sendUpdates"] == "none" for write in state.writes)
 
 
@@ -314,9 +314,13 @@ def test_archive_sweeps_secondary_calendars_and_purges_their_records(tmp_path):
     _run(store, calendar, clock, notifier)
     req = store.get_request(req_id)
     assert req is not None and req.state == REQ_DONE
-    assert sorted(_delete_writes(state)) == [("work@x", "copy"), ("work@x", "theirs")]
+    assert sorted(_delete_writes(state)) == [
+        ("main@x", "kept"),
+        ("work@x", "copy"),
+        ("work@x", "theirs"),
+    ]
     assert calendar.get_event("work@x", "future").status == "confirmed"
-    assert calendar.get_event("main@x", "kept").status == "confirmed"
+    assert calendar.get_event("main@x", "kept").status == "cancelled"
     assert store.list_links() == []
     assert store.list_placements() == []
     assert store.get_notice_state("work@x/theirs") == {}

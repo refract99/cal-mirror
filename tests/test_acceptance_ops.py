@@ -183,7 +183,7 @@ def test_criterion_6_failed_check_deletes_nothing(tmp_path):
     _assert_send_updates(state)
 
 
-def test_criterion_7_cleanup_keeps_invited_and_running_series(tmp_path):
+def test_criterion_7_cleanup_sweeps_old_events_and_keeps_running_series(tmp_path):
     store, state, cal, clock, note = _world(tmp_path)
     client = _client(store, clock)
     state.add_event("main@x", _timed("single", "2024-03-01", "Single"))
@@ -229,10 +229,10 @@ def test_criterion_7_cleanup_keeps_invited_and_running_series(tmp_path):
     assert done is not None
     assert done.state == REQ_DONE
     deleted = sorted(_deletes(state))
-    assert [d for d in deleted if "_" not in d] == ["ended", "single"]
+    assert [d for d in deleted if "_" not in d] == ["ended", "invited", "single"]
     assert all(d.startswith("running_") for d in deleted if "_" in d)
     assert len(_deletes(state)) == sum(counts.values())
-    assert invited is not None and invited.status != "cancelled"
+    assert invited is not None and invited.status == "cancelled"
     assert running is not None and running.status != "cancelled"
     _assert_send_updates(state)
 

@@ -278,7 +278,7 @@ def _archive_plan(
             if start_at >= limit or end_at >= limit:
                 held.add(master_id)
         planning[calendar_id] = [event for event in calendar_events if event.id not in held]
-    sweep = frozenset(settings.secondary_calendars) & frozenset(events)
+    sweep = frozenset((settings.main_calendar, *settings.secondary_calendars)) & frozenset(events)
     plan = plan_cleanup(planning, cutoff, settings.owner_email, links, sweep_calendars=sweep)
     past, too_many = _past_instances(
         calendar, events, plan.sources, limit, settings.owner_email, sweep

@@ -221,7 +221,7 @@ def test_archive_pending_writes_zip_and_does_not_delete(tmp_path):
     assert req is not None
     assert req.state == REQ_READY
     assert req.result["check"] == "ok"
-    assert req.result["counts"] == {"main@x/2024": 27}
+    assert req.result["counts"] == {"main@x/2024": 28}
     assert (tmp_path / "cal-mirror-2024.zip").is_file()
     assert [write["method"] for write in state.writes] == []
     assert notifier.messages == []
@@ -244,13 +244,13 @@ def test_archive_confirmed_deletes_only_the_owned_event(tmp_path):
     assert req is not None
     assert req.state == REQ_DONE
     ids = {write["eventId"] for write in deletes}
-    assert req.result["deleted"] == 27
-    assert len(deletes) == 27
-    assert "owned" in ids and "weekly" not in ids and "invited" not in ids
-    assert all(i == "owned" or i.startswith("weekly_") for i in ids)
+    assert req.result["deleted"] == 28
+    assert len(deletes) == 28
+    assert {"owned", "invited"} <= ids and "weekly" not in ids
+    assert all(i in ("owned", "invited") or i.startswith("weekly_") for i in ids)
     assert all(write["calendarId"] == "main@x" for write in deletes)
     assert all(write["sendUpdates"] == "none" for write in deletes)
-    assert invited is not None and invited.status == "confirmed"
+    assert invited is not None and invited.status == "cancelled"
     assert series is not None and series.status == "confirmed"
     assert _updates_are_none(state)
 
