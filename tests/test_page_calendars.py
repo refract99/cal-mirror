@@ -160,12 +160,13 @@ def test_rule_5_default_not_a_secondary():
     assert store.saved == []
 
 
-def test_rule_5_default_blank():
+def test_rule_5_default_blank_is_allowed_and_means_copy_only_on_a_rule():
     store = FakeStore(CALENDARS)
-    response = post(store, {"main": "a", "secondary": "b"})
-    assert response.status_code == 400
-    assert "The default calendar must be one of the secondary calendars." in response.text
-    assert store.saved == []
+    response = post(store, {"main": "a", "secondary": "b", "default": ""})
+    assert response.status_code == 303
+    assert store.saved[-1].default_calendar == ""
+    page = response.headers["location"]
+    assert 'name="default" value="" checked' in make_client(store).get("/calendars").text, page
 
 
 def test_only_first_failing_rule_is_shown():

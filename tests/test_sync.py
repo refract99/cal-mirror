@@ -472,3 +472,14 @@ def test_auth_error_names_the_reason() -> None:
     assert str(_translate(err, "calendarList.list")) == (
         "Google API calendarList.list failed: HTTP 403 (accessNotConfigured): x"
     )
+
+
+def test_no_default_copies_only_events_a_rule_matches() -> None:
+    from cal_mirror.model import RULE_ORGANIZER, Event, Rule
+    from cal_mirror.rules import choose_calendar
+
+    rules = [Rule(1, RULE_ORGANIZER, "boardy@boardy.ai", "blocksentience")]
+    boardy = Event(calendar_id="main", id="e1", summary="x", organizer_email="boardy@boardy.ai")
+    other = Event(calendar_id="main", id="e2", summary="y", organizer_email="a@b.c")
+    assert choose_calendar(boardy, rules, "")[0] == "blocksentience"
+    assert choose_calendar(other, rules, "")[0] == ""

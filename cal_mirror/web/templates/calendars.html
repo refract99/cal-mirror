@@ -21,6 +21,11 @@
         <td><input type="radio" name="default" value="{{ c.id }}"{% if c.id == default %} checked{% endif %}></td>
       </tr>
     {% endfor %}
+      <tr>
+        <td><em>No default: copy an event only when a rule matches</em></td>
+        <td></td><td></td>
+        <td><input type="radio" name="default" value=""{% if not default %} checked{% endif %}></td>
+      </tr>
     </tbody>
   </table>
   </div>

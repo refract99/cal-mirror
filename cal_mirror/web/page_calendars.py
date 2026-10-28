@@ -46,7 +46,7 @@ def _first_error(owned_ids: set[str], main: str, secondary: list[str], default: 
         return "Pick only calendars you own."
     if main in secondary:
         return "The main calendar cannot also be a secondary calendar."
-    if not default or default not in secondary:
+    if default and default not in secondary:
         return "The default calendar must be one of the secondary calendars."
     return ""
 
