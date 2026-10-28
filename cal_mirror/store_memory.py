@@ -81,6 +81,16 @@ class MemoryStore:
     def delete_link(self, source: str) -> None:
         self._links.pop(source, None)
 
+    def forget_event(self, calendar_id: str, event_id: str) -> None:
+        source = f"{calendar_id}/{event_id}"
+        for key, link in list(self._links.items()):
+            if key == source or (link.calendar_id == calendar_id and link.event_id == event_id):
+                del self._links[key]
+        for pid, entry in list(self._placements.items()):
+            if entry.source == source:
+                del self._placements[pid]
+        self._notices.pop(source, None)
+
     def list_links(self) -> list[Link]:
         return [self._links[source] for source in sorted(self._links)]
 

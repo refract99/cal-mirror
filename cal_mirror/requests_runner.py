@@ -206,6 +206,7 @@ def _handle_archive(
         for write in plan.deletes:
             calendar.apply(write)
             store.delete_link(write.source)
+            store.forget_event(write.calendar_id, write.event_id)
             deleted += 1
     except _CAUGHT as err:
         _fail_archive(
@@ -277,8 +278,11 @@ def _archive_plan(
             if start_at >= limit or end_at >= limit:
                 held.add(master_id)
         planning[calendar_id] = [event for event in calendar_events if event.id not in held]
-    plan = plan_cleanup(planning, cutoff, settings.owner_email, links)
-    past, too_many = _past_instances(calendar, events, plan.sources, limit, settings.owner_email)
+    sweep = frozenset(settings.secondary_calendars) & frozenset(events)
+    plan = plan_cleanup(planning, cutoff, settings.owner_email, links, sweep_calendars=sweep)
+    past, too_many = _past_instances(
+        calendar, events, plan.sources, limit, settings.owner_email, sweep
+    )
     if too_many:
         plan = dataclasses.replace(plan, kept_unbounded=plan.kept_unbounded + too_many)
     if not past:
@@ -288,7 +292,9 @@ def _archive_plan(
         by_id.update({event.id: event for event in found})
         events[calendar_id] = list(by_id.values())
     every = [event for found in past.values() for event in found]
-    cleaned = plan_cleanup(planning, cutoff, settings.owner_email, links, every)
+    cleaned = plan_cleanup(
+        planning, cutoff, settings.owner_email, links, every, sweep_calendars=sweep
+    )
     return events, dataclasses.replace(cleaned, kept_unbounded=cleaned.kept_unbounded + too_many)
 
 
@@ -298,6 +304,7 @@ def _past_instances(
     doomed: frozenset[str],
     limit: datetime,
     owner_email: str,
+    sweep: frozenset[str] = frozenset(),
 ) -> tuple[dict[str, list], int]:
     """Ended occurrences of series the owner owns whose master stays on the calendar.
 
@@ -307,9 +314,13 @@ def _past_instances(
     too_many = 0
     for calendar_id, calendar_events in events.items():
         for master in calendar_events:
-            if not master.recurrence or master.status == "cancelled" or is_mirror(master):
+            if not master.recurrence or master.status == "cancelled":
                 continue
-            if not is_owned(master, owner_email) or source_key(master) in doomed:
+            if calendar_id not in sweep and (
+                is_mirror(master) or not is_owned(master, owner_email)
+            ):
+                continue
+            if source_key(master) in doomed:
                 continue
             if not isinstance(master.start, (datetime, date)):
                 continue

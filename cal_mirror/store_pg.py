@@ -407,6 +407,18 @@ class PgStore:
 
         self._call(run)
 
+    def forget_event(self, calendar_id: str, event_id: str) -> None:
+        def run(conn: psycopg.Connection) -> None:
+            source = f"{calendar_id}/{event_id}"
+            conn.execute(
+                "DELETE FROM links WHERE source = %s OR (calendar_id = %s AND event_id = %s)",
+                (source, calendar_id, event_id),
+            )
+            conn.execute("DELETE FROM placements WHERE source = %s", (source,))
+            conn.execute("DELETE FROM notice_state WHERE source = %s", (source,))
+
+        self._call(run)
+
     def list_links(self) -> list[Link]:
         def run(conn: psycopg.Connection) -> list[Link]:
             rows = conn.execute(

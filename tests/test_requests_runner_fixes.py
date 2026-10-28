@@ -267,3 +267,56 @@ def test_archive_series_exception_moved_past_cutoff_is_not_deleted(tmp_path):
     assert all(w[1].startswith("ended_") for w in _delete_writes(state))
     assert series is not None and series.status == "confirmed"
     assert all(write["sendUpdates"] == "none" for write in state.writes)
+
+
+def test_archive_sweeps_secondary_calendars_and_purges_their_records(tmp_path):
+    from cal_mirror.model import PlacementEntry
+
+    store, state, calendar, clock, notifier = _world(tmp_path, ("main@x", "work@x"))
+    state.add_event(
+        "work@x",
+        _timed(
+            "theirs",
+            "2024-03-02T15:00:00Z",
+            "2024-03-02T16:00:00Z",
+            "Invited",
+            "boss@corp.com",
+            creator={"email": "boss@corp.com"},
+        ),
+    )
+    state.add_event(
+        "work@x",
+        _timed(
+            "copy",
+            "2024-03-03T15:00:00Z",
+            "2024-03-03T16:00:00Z",
+            "Copy",
+            "boss@corp.com",
+            extendedProperties={"private": {MARKER_SOURCE: "main@x/src", MARKER_KIND: KIND_COPY}},
+        ),
+    )
+    state.add_event(
+        "work@x",
+        _timed("future", "2026-12-01T15:00:00Z", "2026-12-01T16:00:00Z", "Later", "boss@corp.com"),
+    )
+    state.add_event(
+        "main@x",
+        _timed("kept", "2024-03-02T15:00:00Z", "2024-03-02T16:00:00Z", "Theirs", "boss@corp.com"),
+    )
+    store.put_link(Link(source="main@x/src", kind=KIND_COPY, calendar_id="work@x", event_id="copy"))
+    store.add_placement(
+        PlacementEntry(id=0, at=NOW, source="work@x/theirs", calendar_id="work@x", title="Invited")
+    )
+    store.set_notice_state("work@x/theirs", {"x": "1"})
+    req_id = _archive(store, tmp_path)
+    _run(store, calendar, clock, notifier)
+    _confirm(store, req_id)
+    _run(store, calendar, clock, notifier)
+    req = store.get_request(req_id)
+    assert req is not None and req.state == REQ_DONE
+    assert sorted(_delete_writes(state)) == [("work@x", "copy"), ("work@x", "theirs")]
+    assert calendar.get_event("work@x", "future").status == "confirmed"
+    assert calendar.get_event("main@x", "kept").status == "confirmed"
+    assert store.list_links() == []
+    assert store.list_placements() == []
+    assert store.get_notice_state("work@x/theirs") == {}

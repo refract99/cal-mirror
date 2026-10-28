@@ -209,8 +209,17 @@ def _exception_keeps(master: Event, peers: Sequence[Event], cutoff: date) -> boo
     return False
 
 
-def _classify(event: Event, cutoff: date, owner_email: str, peers: Sequence[Event]) -> str:
-    if event.status == "cancelled" or is_mirror(event) or not _owned(event, owner_email):
+def _classify(
+    event: Event,
+    cutoff: date,
+    owner_email: str,
+    peers: Sequence[Event],
+    sweep: bool = False,
+) -> str:
+    """`sweep` clears a calendar of everything before the cutoff, whoever made the event."""
+    if event.status == "cancelled":
+        return "keep"
+    if not sweep and (is_mirror(event) or not _owned(event, owner_email)):
         return "keep"
     if event.recurring_event_id != "":
         return "keep"
@@ -234,8 +243,9 @@ def _is_deleted(
     cutoff: date,
     owner_email: str,
     peers: Sequence[Event] = (),
+    sweep: bool = False,
 ) -> bool:
-    return _classify(event, cutoff, owner_email, peers) == "delete"
+    return _classify(event, cutoff, owner_email, peers, sweep) == "delete"
 
 
 def plan_cleanup(
@@ -244,15 +254,18 @@ def plan_cleanup(
     owner_email: str,
     links: Mapping[str, Link],
     past_instances: Sequence[Event] = (),
+    sweep_calendars: frozenset[str] = frozenset(),
 ) -> CleanupPlan:
     """`past_instances` are ended occurrences of series the owner owns that stay on the calendar."""
     doomed: list[Event] = list(past_instances)
     kept_unbounded = 0
-    for calendar_events in events.values():
+    for calendar_id, calendar_events in events.items():
+        sweep = calendar_id in sweep_calendars
         for event in calendar_events:
-            if _is_deleted(event, cutoff, owner_email, calendar_events):
+            kind = _classify(event, cutoff, owner_email, calendar_events, sweep)
+            if kind == "delete":
                 doomed.append(event)
-            elif _classify(event, cutoff, owner_email, calendar_events) == "unbounded":
+            elif kind == "unbounded":
                 kept_unbounded += 1
     doomed.sort(key=source_key)
     deletes: list[PlannedWrite] = []
