@@ -24,10 +24,12 @@
     Check for meetings outside allowed hours</label></p>
   <fieldset>
     <legend>Allowed hours (HH:MM-HH:MM, blank for none)</legend>
+    <div class="weekday-grid">
     {% for day in days %}
-    <p><label>{{ day }}
-      <input type="text" name="allowed_hours_{{ loop.index0 }}" value="{{ values['allowed_hours_' ~ loop.index0] }}"></label></p>
+    <div><label>{{ day }}
+      <input type="text" name="allowed_hours_{{ loop.index0 }}" value="{{ values['allowed_hours_' ~ loop.index0] }}"></label></div>
     {% endfor %}
+    </div>
   </fieldset>
   <button type="submit">Save</button>
 </form>

@@ -41,6 +41,7 @@
 <section id="placements">
   <h2>Default placements</h2>
   {% if placements %}
+  <div class="table-wrapper">
   <table>
     <thead>
       <tr><th>When</th><th>Title</th><th>Organizer</th><th>Guest domains</th><th>Calendar</th><th></th></tr>
@@ -58,6 +59,7 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
   {% else %}
   <p>No default placements yet.</p>
   {% endif %}

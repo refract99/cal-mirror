@@ -6,7 +6,7 @@
   <p id="oauth-error">{{ message }}</p>
   <a href="/google/connect">Try again</a>
   {% else %}
-  <p id="google-state">{{ state }}</p>
+  <p data-state="{{ state|lower }}" id="google-state">{{ state }}</p>
   <a href="/google/connect">{% if state == "Connect" %}Connect Google{% else %}Reconnect Google{% endif %}</a>
   {% endif %}
 {% endblock %}

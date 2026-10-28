@@ -19,15 +19,28 @@ STATE_MISMATCH = "OAuth state does not match"
 SIGN_IN_FAILED = "Google sign-in failed"
 
 
+class FlowConfigError(Exception):
+    """The Google OAuth client is not set up; the message is safe to show."""
+
+
 def get_flow() -> Flow:
+    for name in ("CAL_MIRROR_GOOGLE_CLIENT", "CAL_MIRROR_OAUTH_REDIRECT"):
+        if not os.environ.get(name):
+            raise FlowConfigError(f"{name} is not set on the web app")
     client_path = os.environ["CAL_MIRROR_GOOGLE_CLIENT"]
     redirect = os.environ["CAL_MIRROR_OAUTH_REDIRECT"]
-    return Flow.from_client_secrets_file(
-        client_path,
-        scopes=[CALENDAR_SCOPE],
-        redirect_uri=redirect,
-        autogenerate_code_verifier=False,
-    )
+    try:
+        return Flow.from_client_secrets_file(
+            client_path,
+            scopes=[CALENDAR_SCOPE],
+            redirect_uri=redirect,
+            autogenerate_code_verifier=False,
+        )
+    except (OSError, ValueError) as err:
+        raise FlowConfigError(
+            f"The Google client file ({client_path}) is unreadable or not a Web "
+            f"application OAuth client: {type(err).__name__}"
+        ) from None
 
 
 def _error(request: Request, message: str) -> HTMLResponse:

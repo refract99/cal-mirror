@@ -5,10 +5,12 @@ import os
 import threading
 import time
 from collections.abc import Sequence
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from cal_mirror.crypto import cipher_from_env
 from cal_mirror.ports import Clock, Store, SystemClock
@@ -22,9 +24,12 @@ from cal_mirror.web import (
     page_signin,
     page_status,
 )
-from cal_mirror.web.deps import SESSION_COOKIE, session_hash
+from cal_mirror.web.deps import SESSION_COOKIE, session_hash, templates
+from cal_mirror.web.page_oauth import FlowConfigError
 
 PUBLIC_PATHS = frozenset({"/signin", "/signin/totp", "/setup"})
+STATIC_PREFIX = "/static/"
+STATIC_DIR = Path(__file__).parent / "static"
 
 PAGES = (
     page_signin,
@@ -58,8 +63,15 @@ def create_app(store: Store, clock: Clock | None = None) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.state.store = store
     app.state.clock = clock or SystemClock()
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     for page in PAGES:
         app.include_router(page.router)
+
+    @app.exception_handler(FlowConfigError)
+    def flow_config_error(request: Request, exc: FlowConfigError) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request, "oauth.html", {"state": "", "message": str(exc)}, status_code=500
+        )
 
     @app.get("/")
     def root() -> RedirectResponse:
@@ -72,7 +84,9 @@ def create_app(store: Store, clock: Clock | None = None) -> FastAPI:
             now = request.app.state.clock.now()
             if request.app.state.store.session_valid(session_hash(token), now):
                 request.state.user = "owner"
-        if getattr(request.state, "user", None) is None and request.url.path not in PUBLIC_PATHS:
+        if getattr(request.state, "user", None) is None and (
+            request.url.path not in PUBLIC_PATHS and not request.url.path.startswith(STATIC_PREFIX)
+        ):
             response = RedirectResponse("/signin", status_code=303)
         else:
             response = await call_next(request)

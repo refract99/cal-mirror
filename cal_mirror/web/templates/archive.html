@@ -17,6 +17,7 @@
   <button type="submit">Start archive</button>
 </form>
 {% endif %}
+<div class="table-wrapper">
 <table>
   <tr><th>Id</th><th>Cutoff</th><th>Destination</th><th>State</th></tr>
   {% for r in requests %}
@@ -28,4 +29,5 @@
   </tr>
   {% endfor %}
 </table>
+</div>
 {% endblock %}

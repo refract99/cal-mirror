@@ -27,6 +27,7 @@
 {% if placement %}<p>New rule from: {{ placement.title }}</p>{% endif %}
 <form method="post" action="/rules">
   <input type="hidden" name="count" value="{{ count }}">
+  <div class="table-wrapper">
   <table>
     <tr><th>Kind</th><th>Value</th><th>Calendar</th><th>Position</th><th>Delete</th></tr>
     {% for row in rows %}
@@ -53,6 +54,7 @@
     </tr>
     {% endfor %}
   </table>
+  </div>
   <button type="submit">Save</button>
 </form>
 {% endblock %}

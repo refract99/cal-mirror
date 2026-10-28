@@ -2,18 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}cal-mirror{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-  <nav>
-    <a href="/status">Status</a>
-    <a href="/calendars">Calendars</a>
-    <a href="/rules">Rules</a>
-    <a href="/settings">Settings</a>
-    <a href="/archive">Archive</a>
-    <a href="/google">Google</a>
-    <a href="/signout">Sign out</a>
-  </nav>
+<body class="{% block body_class %}{% endblock %}">
+  {% set path = request.url.path if request else "" %}
+  {% if not hide_nav %}
+  <header class="site-header">
+    <div class="nav-container">
+      <a href="/status" class="brand">cal-mirror</a>
+      <nav class="main-nav" aria-label="Main">
+        {% for href, label in [("/status", "Status"), ("/calendars", "Calendars"), ("/rules", "Rules"), ("/settings", "Settings"), ("/archive", "Archive"), ("/google", "Google")] %}
+        <a href="{{ href }}"{% if path == href %} class="active" aria-current="page"{% endif %}>{{ label }}</a>
+        {% endfor %}
+        <a href="/signout" class="nav-signout">Sign out</a>
+      </nav>
+    </div>
+  </header>
+  {% endif %}
+  <main class="container">
   {% block content %}{% endblock %}
+  </main>
 </body>
 </html>

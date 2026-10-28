@@ -272,3 +272,23 @@ def test_get_flow_reads_environment(monkeypatch, tmp_path):
         redirect,
         [CALENDAR_SCOPE],
     )
+
+
+def test_connect_without_config_shows_a_readable_error(monkeypatch):
+    from cal_mirror.web.app import create_app
+
+    monkeypatch.delenv("CAL_MIRROR_GOOGLE_CLIENT", raising=False)
+    store = FakeStore()
+    store.session_valid = lambda *_: True
+    client = TestClient(create_app(store, FixedClock(datetime(2026, 1, 1, tzinfo=UTC))))
+    client.cookies.set("cal_mirror_session", "fixture-session-1")
+    response = client.get("/google/connect")
+    assert response.status_code == 500
+    assert "CAL_MIRROR_GOOGLE_CLIENT is not set" in response.text
+
+
+def test_stylesheet_is_served_without_sign_in():
+    from cal_mirror.web.app import create_app
+
+    response = TestClient(create_app(FakeStore())).get("/static/style.css")
+    assert response.status_code == 200
