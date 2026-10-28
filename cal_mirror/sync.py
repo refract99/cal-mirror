@@ -281,7 +281,7 @@ def _apply_phase(
     owned: set[str],
     listed: list[CalendarInfo],
 ) -> None:
-    planned = [(KIND_BLOCKED, item) for item in plan_blocked(phase, blocked, run.settings)]
+    planned = [(KIND_BLOCKED, item) for item in plan_blocked(phase, blocked, run.settings, now)]
     planned += [(KIND_COPY, item) for item in plan_copies(phase, copies, run.settings, place)]
     for kind, write in planned:
         if kind == KIND_COPY and write.op == OP_CREATE and write.calendar_id == "":

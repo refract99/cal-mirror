@@ -1,4 +1,5 @@
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 
 from cal_mirror.model import (
     BLOCKED_TITLE,
@@ -17,6 +18,7 @@ from cal_mirror.model import (
     is_mirror,
     source_key,
 )
+from cal_mirror.plan_move import is_future
 
 
 def blocked_body(event: Event, main_calendar: str) -> Event:
@@ -96,8 +98,12 @@ def _plan_one(event: Event, links: Mapping[str, Link], main: str) -> PlannedWrit
 
 
 def plan_blocked(
-    changes: Sequence[Event], links: Mapping[str, Link], settings: Settings
+    changes: Sequence[Event],
+    links: Mapping[str, Link],
+    settings: Settings,
+    now: datetime | None = None,
 ) -> list[PlannedWrite]:
+    """Plan BLOCKED events on main; with `now`, none is created for a past event."""
     main = settings.main_calendar
     if main == "":
         return []
@@ -111,6 +117,9 @@ def plan_blocked(
         if is_mirror(event):
             continue
         write = _plan_one(event, links, main)
+        if write is not None and write.op == OP_CREATE and now is not None:
+            if not is_future(event, now):
+                continue
         if write is not None:
             writes.append(write)
     return writes

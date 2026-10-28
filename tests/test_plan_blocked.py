@@ -190,3 +190,15 @@ def test_blocked_body_fields():
     assert b.status == "confirmed"
     assert b.recurring_event_id == ""
     assert b.private == {MARKER_SOURCE: "sec@x/e1", MARKER_KIND: KIND_BLOCKED}
+
+
+def test_no_new_blocked_event_for_a_past_event():
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime(2026, 11, 3, 12, 0, tzinfo=UTC)
+    past = ev(start=now - timedelta(days=2), end=now - timedelta(days=2) + timedelta(hours=1))
+    future = ev(id="e2", start=now + timedelta(days=1), end=now + timedelta(days=1, hours=1))
+    writes = plan_blocked([past, future], {}, S, now)
+    from cal_mirror.model import source_key
+
+    assert [w.source for w in writes] == [source_key(future)]
