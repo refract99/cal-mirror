@@ -10,6 +10,8 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from cal_mirror.model import (
+    KIND_BLOCKED,
+    MARKER_KIND,
     OP_CREATE,
     OP_DELETE,
     OP_MOVE,
@@ -160,6 +162,8 @@ def event_to_google(event: Event) -> dict:
         body["conferenceData"] = conference
     body["extendedProperties"] = {"private": dict(event.private)}
     body["attendees"] = []
+    if event.private.get(MARKER_KIND) == KIND_BLOCKED:
+        body["reminders"] = {"useDefault": False, "overrides": []}
     return body
 
 

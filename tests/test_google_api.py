@@ -429,3 +429,12 @@ def test_every_write_is_silent_and_guest_free():
         assert kwargs["sendUpdates"] == "none"
         assert not kwargs.get("body", {}).get("attendees")
         assert "createRequest" not in kwargs.get("body", {}).get("conferenceData", {})
+
+
+def test_blocked_events_are_written_without_reminders_and_copies_are_untouched():
+    from cal_mirror.model import KIND_BLOCKED, KIND_COPY, MARKER_KIND, Event
+
+    blocked = Event(calendar_id="m", id="", private={MARKER_KIND: KIND_BLOCKED})
+    copy = Event(calendar_id="m", id="", private={MARKER_KIND: KIND_COPY})
+    assert event_to_google(blocked)["reminders"] == {"useDefault": False, "overrides": []}
+    assert "reminders" not in event_to_google(copy)
