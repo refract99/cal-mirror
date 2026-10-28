@@ -470,5 +470,5 @@ def test_auth_error_names_the_reason() -> None:
     body = {"error": {"message": "x", "errors": [{"reason": "accessNotConfigured"}]}}
     err = HttpError(httplib2.Response({"status": "403"}), json.dumps(body).encode())
     assert str(_translate(err, "calendarList.list")) == (
-        "Google API calendarList.list failed: HTTP 403 (accessNotConfigured)"
+        "Google API calendarList.list failed: HTTP 403 (accessNotConfigured): x"
     )

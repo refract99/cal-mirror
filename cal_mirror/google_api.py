@@ -170,6 +170,15 @@ def _error_reasons(err: HttpError) -> set[str]:
     return {str(d["reason"]) for d in details if isinstance(d, dict) and "reason" in d}
 
 
+def _error_message(err: HttpError) -> str:
+    """Google's own explanation, e.g. which project has the API disabled. No secrets."""
+    try:
+        body = json.loads(err.content.decode("utf-8"))["error"]["message"]
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return ""
+    return " ".join(str(body).split())[:300]
+
+
 def _translate(err: HttpError | RefreshError, method: str, *, expired_ok: bool = False):
     if isinstance(err, RefreshError):
         reason = str(err.args[0])[:80] if err.args else ""
@@ -177,6 +186,8 @@ def _translate(err: HttpError | RefreshError, method: str, *, expired_ok: bool =
     status = int(err.resp.status)
     reasons = ",".join(sorted(_error_reasons(err)))
     message = f"Google API {method} failed: HTTP {status}" + (f" ({reasons})" if reasons else "")
+    if status in (401, 403) and (detail := _error_message(err)):
+        message += f": {detail}"
     if status == 410 and expired_ok:
         return SyncTokenExpired(message)
     if status == 401 or (status == 403 and not _error_reasons(err) & _RATE_REASONS):
