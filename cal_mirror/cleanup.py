@@ -39,6 +39,14 @@ def _owned(event: Event, owner_email: str) -> bool:
     )
 
 
+def is_owned(event: Event, owner_email: str) -> bool:
+    return _owned(event, owner_email)
+
+
+def exceeds_budget(recurrence: Sequence[str]) -> bool:
+    return _exceeds_budget(recurrence)
+
+
 def _limit(cutoff: date) -> datetime:
     return datetime.combine(cutoff, time(0), tzinfo=UTC)
 
@@ -235,8 +243,10 @@ def plan_cleanup(
     cutoff: date,
     owner_email: str,
     links: Mapping[str, Link],
+    past_instances: Sequence[Event] = (),
 ) -> CleanupPlan:
-    doomed: list[Event] = []
+    """`past_instances` are ended occurrences of series the owner owns that stay on the calendar."""
+    doomed: list[Event] = list(past_instances)
     kept_unbounded = 0
     for calendar_events in events.values():
         for event in calendar_events:

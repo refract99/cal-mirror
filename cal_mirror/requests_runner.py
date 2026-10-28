@@ -7,7 +7,7 @@ from pathlib import Path
 
 from cal_mirror.alerts import step_alert
 from cal_mirror.archive import ArchiveError, archived_sources, write_archive
-from cal_mirror.cleanup import plan_cleanup, verify_archive
+from cal_mirror.cleanup import exceeds_budget, is_owned, plan_cleanup, verify_archive
 from cal_mirror.model import (
     FAIL_ARCHIVE,
     KIND_COPY,
@@ -24,6 +24,8 @@ from cal_mirror.model import (
     Request,
     Rule,
     Settings,
+    is_mirror,
+    source_key,
 )
 from cal_mirror.plan_move import plan_moves
 from cal_mirror.ports import (
@@ -38,6 +40,7 @@ from cal_mirror.ports import (
 from cal_mirror.rules import choose_calendar
 
 _LOG = logging.getLogger("cal_mirror.requests")
+MAX_PAST_INSTANCES = 2000
 _CAUGHT = (CalendarError, StoreError, ArchiveError, ValueError, KeyError, TypeError)
 
 
@@ -274,7 +277,64 @@ def _archive_plan(
             if start_at >= limit or end_at >= limit:
                 held.add(master_id)
         planning[calendar_id] = [event for event in calendar_events if event.id not in held]
-    return events, plan_cleanup(planning, cutoff, settings.owner_email, links)
+    plan = plan_cleanup(planning, cutoff, settings.owner_email, links)
+    past, too_many = _past_instances(calendar, events, plan.sources, limit, settings.owner_email)
+    if too_many:
+        plan = dataclasses.replace(plan, kept_unbounded=plan.kept_unbounded + too_many)
+    if not past:
+        return events, plan
+    for calendar_id, found in past.items():
+        by_id = {event.id: event for event in events[calendar_id]}
+        by_id.update({event.id: event for event in found})
+        events[calendar_id] = list(by_id.values())
+    every = [event for found in past.values() for event in found]
+    cleaned = plan_cleanup(planning, cutoff, settings.owner_email, links, every)
+    return events, dataclasses.replace(cleaned, kept_unbounded=cleaned.kept_unbounded + too_many)
+
+
+def _past_instances(
+    calendar: Calendar,
+    events: dict[str, list],
+    doomed: frozenset[str],
+    limit: datetime,
+    owner_email: str,
+) -> tuple[dict[str, list], int]:
+    """Ended occurrences of series the owner owns whose master stays on the calendar.
+
+    A series with more than MAX_PAST_INSTANCES ended occurrences is left alone and counted.
+    """
+    found: dict[str, list] = {}
+    too_many = 0
+    for calendar_id, calendar_events in events.items():
+        for master in calendar_events:
+            if not master.recurrence or master.status == "cancelled" or is_mirror(master):
+                continue
+            if not is_owned(master, owner_email) or source_key(master) in doomed:
+                continue
+            if not isinstance(master.start, (datetime, date)):
+                continue
+            starts = (
+                master.start
+                if isinstance(master.start, datetime)
+                else datetime.combine(master.start, time(0), tzinfo=UTC)
+            )
+            if starts >= limit:
+                continue
+            ended = []
+            for item in calendar.list_instances(calendar_id, master.id, limit):
+                if item.status == "cancelled" or item.start is None:
+                    continue
+                end = item.end if item.end is not None else item.start
+                end_at = (
+                    end if isinstance(end, datetime) else datetime.combine(end, time(0), tzinfo=UTC)
+                )
+                if end_at <= limit:
+                    ended.append(item)
+            if len(ended) > MAX_PAST_INSTANCES:
+                too_many += 0 if exceeds_budget(master.recurrence) else 1
+            elif ended:
+                found.setdefault(calendar_id, []).extend(ended)
+    return found, too_many
 
 
 def _copy_pairs(store: Store, calendar: Calendar) -> list[tuple[Link, Event]]:

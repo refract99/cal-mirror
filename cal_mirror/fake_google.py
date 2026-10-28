@@ -232,7 +232,43 @@ class FakeCalendar:
             events[item["id"]] = item
         return copy.deepcopy(item)
 
+    def instances(self, calendar_id: str, event_id: str, time_max: str | None) -> dict:
+        from dateutil.rrule import rrulestr
+
+        series = self._event_or_404(calendar_id, event_id)
+        start, end = _start_and_end(series)
+        limit = _parse_rfc3339(time_max) if time_max else None
+        if start is None or end is None or not series.get("recurrence"):
+            return {"items": []}
+        rule = rrulestr("\n".join(series["recurrence"]), dtstart=start, forceset=True)
+        items = []
+        for occurrence in rule:
+            if limit is not None and occurrence >= limit:
+                break
+            suffix = occurrence.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+            instance_id = f"{event_id}_{suffix}"
+            existing = self.events[calendar_id].get(instance_id)
+            if existing is not None:
+                if existing.get("status") != "cancelled":
+                    items.append(copy.deepcopy(existing))
+                continue
+            item = copy.deepcopy(series)
+            item.pop("recurrence", None)
+            item["id"] = instance_id
+            item["recurringEventId"] = event_id
+            item["start"] = {
+                "dateTime": occurrence.astimezone(UTC).isoformat().replace("+00:00", "Z")
+            }
+            finish = occurrence + (end - start)
+            item["end"] = {"dateTime": finish.astimezone(UTC).isoformat().replace("+00:00", "Z")}
+            items.append(item)
+        return {"items": items}
+
     def delete_event(self, calendar_id: str, event_id: str) -> str:
+        if event_id not in self._events_or_404(calendar_id):
+            created = self._exception_from_patch_id(calendar_id, event_id)
+            self._touch(calendar_id, event_id, created)
+            self.events[calendar_id][event_id] = created
         item = self._event_or_404(calendar_id, event_id)
         if item.get("status") == "cancelled":
             raise _http_error(410, "Gone")
@@ -415,6 +451,18 @@ class _Events:
             )
 
         return _Call(run)
+
+    def instances(
+        self,
+        *,
+        calendarId: str,
+        eventId: str,
+        timeMax: str | None = None,
+        pageToken: str | None = None,
+        showDeleted: bool = False,
+        maxResults: int = 2500,
+    ):
+        return _Call(lambda: self._state.instances(calendarId, eventId, timeMax))
 
     def insert(
         self,

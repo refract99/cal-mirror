@@ -46,8 +46,8 @@ A booking assistant sees every commitment I have, because each event on my secon
 - **Archive:** every event before the cutoff on every calendar the owner owns, including events he was invited to. One file per year: a zip with one `.ics` file and one raw `.json` file per calendar.
 - **Check:** the app reads the archive back and compares its event count with the events it will delete. If the counts differ, it deletes nothing.
 - **Dry run:** the web app shows the counts per calendar and per year. The app deletes only after the owner confirms.
-- **Delete:** single events before the cutoff, and recurring series that ended before the cutoff, that the owner organized or created. Mirror events the app wrote are deleted with their source.
-- **Keep:** events the owner was invited to, and every series that runs past the cutoff. The past instances of such a series are archived but not deleted.
+- **Delete:** single events before the cutoff, recurring series that ended before the cutoff, and the occurrences before the cutoff of series that run on (the series itself stays), that the owner organized or created. Mirror events the app wrote are deleted with their source.
+- **Keep:** events the owner was invited to, every series that runs past the cutoff (only its ended occurrences go), and a series with more than 2000 ended occurrences, which the dry run reports as kept.
 
 ### 3. Web app (config only)
 
@@ -77,7 +77,7 @@ A booking assistant sees every commitment I have, because each event on my secon
 - Do not call an LLM, a judge model or any AI service.
 - Do not send email or invitations. Every Google write uses `sendUpdates=none`. Never add guests to an event the app writes.
 - Do not edit or delete an event the app did not create, except in a cleanup that the owner confirmed.
-- Do not delete an event the owner was invited to, or any instance of a series that runs past the cutoff.
+- Do not delete an event the owner was invited to, or the series record of one that runs past the cutoff.
 - Do not delete anything before the archive for that run is written and its count check passes.
 - Do not touch a calendar the owner does not own. Do not support a second Google account or a second user.
 - Do not let the web app read or write calendar events.
@@ -94,7 +94,7 @@ A booking assistant sees every commitment I have, because each event on my secon
 4. Free events, declined events and events on calendars that are not selected are not mirrored. An event that changes from busy to free loses its mirror. `[check]`
 5. Every Google write sends `sendUpdates=none`, and no event the app writes has guests. `[check]`
 6. Archive and cleanup writes one zip per year that holds an `.ics` and a `.json` file per calendar. It deletes nothing when the count check fails or before the owner confirms. `[check]`
-7. Cleanup keeps invited events and series that run past the cutoff, and deletes only what the dry run listed. `[check]`
+7. Cleanup keeps invited events and the records of series that run past the cutoff, deletes the ended occurrences of the owner's series, and deletes only what the dry run listed. `[check]`
 8. The web app needs a password and, when 2FA is on, a valid TOTP or recovery code. Five failed attempts lock sign-in for a time. `[check]`
 9. No secret appears in plain text in the database, the logs or an alert. `[check]`
 10. A failure sends one ntfy alert, and recovery sends one more. `[check]`

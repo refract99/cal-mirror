@@ -363,6 +363,30 @@ class GoogleCalendar:
             extra["timeMax"] = _utc_text(time_max)
         return self._list_events(calendar_id, extra)[0]
 
+    def list_instances(self, calendar_id: str, event_id: str, time_max: datetime) -> list[Event]:
+        found: list[Event] = []
+        page_token = None
+        while True:
+            response = _call(
+                "events.instances",
+                lambda token=page_token: (
+                    self._service.events()
+                    .instances(
+                        calendarId=calendar_id,
+                        eventId=event_id,
+                        timeMax=_utc_text(time_max),
+                        pageToken=token,
+                        showDeleted=False,
+                        maxResults=_PAGE_SIZE,
+                    )
+                    .execute()
+                ),
+            )
+            found.extend(event_from_google(calendar_id, i) for i in response.get("items") or ())
+            page_token = response.get("nextPageToken")
+            if not page_token:
+                return found
+
     def get_event(self, calendar_id: str, event_id: str) -> Event | None:
         try:
             item = self._service.events().get(calendarId=calendar_id, eventId=event_id).execute()

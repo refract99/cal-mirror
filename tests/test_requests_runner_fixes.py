@@ -122,8 +122,10 @@ def test_archive_pending_stores_the_owned_delete(tmp_path):
     req = store.get_request(req_id)
     assert req is not None
     assert req.state == REQ_READY
-    assert req.result["deletes"] == [["main@x", "owned"]]
-    assert req.result["counts"] == {"main@x/2024": 1}
+    deletes = req.result["deletes"]
+    assert deletes[0] == ["main@x", "owned"]
+    assert all(d[1].startswith("weekly_") for d in deletes[1:]) and len(deletes) == 27
+    assert req.result["counts"] == {"main@x/2024": 27}
     assert _delete_writes(state) == []
     assert all(write["sendUpdates"] == "none" for write in state.writes)
 
@@ -149,14 +151,16 @@ def test_archive_confirm_deletes_source_and_linked_copy(tmp_path):
     _run(store, calendar, clock, notifier)
     ready = store.get_request(req_id)
     assert ready is not None
-    assert ready.result["deletes"] == [["main@x", "owned"], ["work@x", "copy-owned"]]
+    whole = [d for d in ready.result["deletes"] if not d[1].startswith("weekly_")]
+    assert whole == [["main@x", "owned"], ["work@x", "copy-owned"]]
     _confirm(store, req_id)
     _run(store, calendar, clock, notifier)
     req = store.get_request(req_id)
     assert req is not None
     assert req.state == REQ_DONE
-    assert req.result["deleted"] == 2
-    assert _delete_writes(state) == [("main@x", "owned"), ("work@x", "copy-owned")]
+    assert req.result["deleted"] == 28
+    whole = [w for w in _delete_writes(state) if not w[1].startswith("weekly_")]
+    assert whole == [("main@x", "owned"), ("work@x", "copy-owned")]
     assert all(write["sendUpdates"] == "none" for write in state.writes)
 
 
@@ -219,8 +223,10 @@ def test_archive_confirm_unchanged_deletes_the_owned_event(tmp_path):
     req = store.get_request(req_id)
     assert req is not None
     assert req.state == REQ_DONE
-    assert req.result["deleted"] == 1
-    assert _delete_writes(state) == [("main@x", "owned")]
+    assert req.result["deleted"] == 27
+    writes = _delete_writes(state)
+    assert writes[0] == ("main@x", "owned")
+    assert all(w[1].startswith("weekly_") for w in writes[1:])
     assert all(write["sendUpdates"] == "none" for write in state.writes)
 
 
@@ -249,14 +255,15 @@ def test_archive_series_exception_moved_past_cutoff_is_not_deleted(tmp_path):
     ready = store.get_request(req_id)
     assert ready is not None
     assert ready.state == REQ_READY
-    assert ready.result["deletes"] == []
+    assert len(ready.result["deletes"]) == 21
+    assert all(d[1].startswith("ended_") for d in ready.result["deletes"])
     _confirm(store, req_id)
     _run(store, calendar, clock, notifier)
     req = store.get_request(req_id)
     series = calendar.get_event("main@x", "ended")
     assert req is not None
     assert req.state == REQ_DONE
-    assert req.result["deleted"] == 0
-    assert _delete_writes(state) == []
+    assert req.result["deleted"] == 21
+    assert all(w[1].startswith("ended_") for w in _delete_writes(state))
     assert series is not None and series.status == "confirmed"
     assert all(write["sendUpdates"] == "none" for write in state.writes)

@@ -86,6 +86,10 @@ class Calendar(Protocol):
 
     def get_event(self, calendar_id: str, event_id: str) -> Event | None: ...
 
+    def list_instances(
+        self, calendar_id: str, event_id: str, time_max: datetime
+    ) -> list[Event]: ...
+
     def apply(self, write: PlannedWrite) -> str: ...
 
 

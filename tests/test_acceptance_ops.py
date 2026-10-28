@@ -228,7 +228,9 @@ def test_criterion_7_cleanup_keeps_invited_and_running_series(tmp_path):
     running = cal.get_event("main@x", "running")
     assert done is not None
     assert done.state == REQ_DONE
-    assert sorted(_deletes(state)) == ["ended", "single"]
+    deleted = sorted(_deletes(state))
+    assert [d for d in deleted if "_" not in d] == ["ended", "single"]
+    assert all(d.startswith("running_") for d in deleted if "_" in d)
     assert len(_deletes(state)) == sum(counts.values())
     assert invited is not None and invited.status != "cancelled"
     assert running is not None and running.status != "cancelled"
