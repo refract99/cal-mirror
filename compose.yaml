@@ -1,13 +1,11 @@
 # Quickstart: web app, worker and Postgres on one machine with Docker Compose.
-# Setup: sh deploy/compose/init.sh, put your Google OAuth client at ./google-client.json,
-# then docker compose up -d --build. See docs/quickstart.md.
+# Setup: sh deploy/compose/init.sh, then docker compose up -d --build. See docs/quickstart.md.
 name: cal-mirror
 
 x-app-env: &app-env
   CAL_MIRROR_DSN: host=db dbname=cal_mirror user=cal_mirror
   PGPASSWORD: ${PG_PASSWORD:?run deploy/compose/init.sh first}
   CAL_MIRROR_SECRET_KEY: ${CAL_MIRROR_SECRET_KEY:?run deploy/compose/init.sh first}
-  CAL_MIRROR_GOOGLE_CLIENT: /secrets/google-client.json
 
 services:
   db:
@@ -60,7 +58,6 @@ services:
       - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8443}:8443"
     volumes:
       - certs:/certs:ro
-      - ./google-client.json:/secrets/google-client.json:ro
 
   worker:
     build:
@@ -75,7 +72,6 @@ services:
         condition: service_completed_successfully
     environment: *app-env
     volumes:
-      - ./google-client.json:/secrets/google-client.json:ro
       - ${ARCHIVE_DIR:-./archive}:/archive
 
 volumes:

@@ -1,9 +1,10 @@
 import dataclasses
+import json
 import os
 import secrets
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from google_auth_oauthlib.flow import Flow
 from oauthlib.oauth2 import OAuth2Error
@@ -23,23 +24,57 @@ class FlowConfigError(Exception):
     """The Google OAuth client is not set up; the message is safe to show."""
 
 
-def get_flow() -> Flow:
-    for name in ("CAL_MIRROR_GOOGLE_CLIENT", "CAL_MIRROR_OAUTH_REDIRECT"):
-        if not os.environ.get(name):
-            raise FlowConfigError(f"{name} is not set on the web app")
-    client_path = os.environ["CAL_MIRROR_GOOGLE_CLIENT"]
-    redirect = os.environ["CAL_MIRROR_OAUTH_REDIRECT"]
+CLIENT_SECRET = "google_client"  # noqa: S105 (store key name)
+NOT_SET_UP = "Enter your Google OAuth client ID and secret below first"
+GOOGLE_AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
+GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token"  # noqa: S105 (public URL)
+
+
+def redirect_uri(request: Request) -> str:
+    return os.environ.get("CAL_MIRROR_OAUTH_REDIRECT") or f"{request.base_url}google/callback"
+
+
+def load_client(store: Store) -> dict | None:
+    stored = store.get_secret(CLIENT_SECRET)
+    if stored:
+        try:
+            config = json.loads(stored)
+        except ValueError:
+            raise FlowConfigError(
+                "The stored Google client is unreadable; enter it again"
+            ) from None
+        if isinstance(config, dict):
+            return config
+        raise FlowConfigError("The stored Google client is unreadable; enter it again")
+    path = os.environ.get("CAL_MIRROR_GOOGLE_CLIENT", "")
+    if not path:
+        return None
     try:
-        return Flow.from_client_secrets_file(
-            client_path,
-            scopes=[CALENDAR_SCOPE],
-            redirect_uri=redirect,
-            autogenerate_code_verifier=False,
-        )
+        with open(path, encoding="utf-8") as handle:
+            config = json.load(handle)
+    except FileNotFoundError:
+        return None
     except (OSError, ValueError) as err:
         raise FlowConfigError(
-            f"The Google client file ({client_path}) is unreadable or not a Web "
-            f"application OAuth client: {type(err).__name__}"
+            f"The Google client file ({path}) is unreadable: {type(err).__name__}"
+        ) from None
+    return config if isinstance(config, dict) else None
+
+
+def get_flow(request: Request, store: Annotated[Store, Depends(get_store)]) -> Flow:
+    config = load_client(store)
+    if config is None:
+        raise FlowConfigError(NOT_SET_UP)
+    try:
+        return Flow.from_client_config(
+            config,
+            scopes=[CALENDAR_SCOPE],
+            redirect_uri=redirect_uri(request),
+            autogenerate_code_verifier=False,
+        )
+    except (ValueError, KeyError) as err:
+        raise FlowConfigError(
+            f"The Google client is not a Web application OAuth client: {type(err).__name__}"
         ) from None
 
 
@@ -62,7 +97,39 @@ def google_page(
         state = "Connected"
     else:
         state = "Reconnect"
-    return templates.TemplateResponse(request, "oauth.html", {"state": state, "message": ""})
+    return templates.TemplateResponse(
+        request,
+        "oauth.html",
+        {
+            "state": state,
+            "message": "",
+            "has_client": load_client(store) is not None,
+            "redirect_uri": redirect_uri(request),
+        },
+    )
+
+
+@router.post("/google/client", response_model=None)
+def google_client(
+    request: Request,
+    user: Annotated[str, Depends(current_user)],
+    store: Annotated[Store, Depends(get_store)],
+    client_id: Annotated[str, Form()] = "",
+    client_secret: Annotated[str, Form()] = "",
+) -> HTMLResponse | RedirectResponse:
+    client_id, client_secret = client_id.strip(), client_secret.strip()
+    if not client_id or not client_secret:
+        return _error(request, "Both the client ID and the client secret are required")
+    config = {
+        "web": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "auth_uri": GOOGLE_AUTH_URI,
+            "token_uri": GOOGLE_TOKEN_URI,
+        }
+    }
+    store.set_secret(CLIENT_SECRET, json.dumps(config))
+    return RedirectResponse("/google", status_code=303)
 
 
 @router.get("/google/connect")

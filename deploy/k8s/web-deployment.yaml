@@ -56,8 +56,6 @@ spec:
                 secretKeyRef:
                   name: cal-mirror-secrets
                   key: secret-key
-            - name: CAL_MIRROR_GOOGLE_CLIENT
-              value: /secrets/google/google-client.json
             - name: CAL_MIRROR_OAUTH_REDIRECT
               valueFrom:
                 configMapKeyRef:
@@ -77,21 +75,12 @@ spec:
             capabilities:
               drop: [ALL]
           volumeMounts:
-            - name: google-client
-              mountPath: /secrets/google
-              readOnly: true
             - name: tls
               mountPath: /tls
               readOnly: true
             - name: tmp
               mountPath: /tmp
       volumes:
-        - name: google-client
-          secret:
-            secretName: cal-mirror-secrets
-            items:
-              - key: google-client.json
-                path: google-client.json
         - name: tmp
           emptyDir: {}
         - name: tls

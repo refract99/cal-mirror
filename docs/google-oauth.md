@@ -9,6 +9,6 @@ cal-mirror reads and writes your calendars through the Google Calendar API, so y
 5. **Credentials → Create credentials → OAuth client ID → Web application.** Under **Authorized redirect URIs** add the address of your cal-mirror web app followed by `/google/callback`:
    - Compose quickstart on the same machine: `https://localhost:8443/google/callback`
    - Otherwise `https://<HOST_NAME>/google/callback`. Google requires HTTPS (except for `localhost`), and the host must be a name under a public domain, not a bare IP. It does not have to be reachable from the internet; a name that only resolves on your LAN works.
-6. Download the client JSON. It is your `google-client.json`. Keep it out of git.
+6. Copy the **client ID** and **client secret**. You paste them once on the Google page of the web app; they are stored encrypted in the database. No file or Kubernetes secret is needed. (Setting `CAL_MIRROR_GOOGLE_CLIENT` to a client JSON path still works as a fallback.)
 
-The redirect URI must match exactly what the app sends: `CAL_MIRROR_OAUTH_REDIRECT` (set from `HOST_NAME` and `WEB_PORT` in the Compose setup, and from `OAUTH_REDIRECT` in the Kubernetes settings).
+The Google page shows the redirect URI to register. By default it is the address you browse the app at plus `/google/callback`; the redirect URI must match exactly what the app sends. To override it, set `CAL_MIRROR_OAUTH_REDIRECT` (set from `HOST_NAME` and `WEB_PORT` in the Compose setup, and from `OAUTH_REDIRECT` in the Kubernetes settings).

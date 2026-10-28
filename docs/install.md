@@ -47,8 +47,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 ```sh
 kubectl -n cal-mirror create secret generic cal-mirror-secrets \
   --from-literal=secret-key=<fernet key> \
-  --from-literal=pg-password=<password> \
-  --from-file=google-client.json=<path to OAuth client json>
+  --from-literal=pg-password=<password>
 ```
 
 ## 5. Archive folder

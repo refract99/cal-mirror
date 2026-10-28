@@ -132,15 +132,10 @@ def _exit(monkeypatch: pytest.MonkeyPatch, path: Path) -> pytest.ExceptionInfo[S
     return raised
 
 
-def test_missing_client_file(monkeypatch, tmp_path, env) -> None:
-    raised = _exit(monkeypatch, tmp_path / "absent.json")
-    assert str(raised.value) == UNREADABLE + "FileNotFoundError"
-
-
-def test_missing_client_file_calls_nothing_else(monkeypatch, tmp_path, env) -> None:
-    raised = _exit(monkeypatch, tmp_path / "absent.json")
-    assert env == []
-    assert raised.value.__suppress_context__ is True
+def test_missing_client_file_is_not_fatal(monkeypatch, tmp_path, env) -> None:
+    monkeypatch.setenv("CAL_MIRROR_GOOGLE_CLIENT", str(tmp_path / "absent.json"))
+    main()
+    assert len(env) == 2
 
 
 def test_directory_client_path(monkeypatch, tmp_path, env) -> None:

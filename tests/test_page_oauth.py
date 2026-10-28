@@ -252,26 +252,65 @@ def test_signed_out_redirects_to_signin():
     assert (response.status_code, response.headers["location"]) == (303, "/signin")
 
 
-def test_get_flow_reads_environment(monkeypatch, tmp_path):
-    client = {
-        "web": {
-            "client_id": "fixture-client-1",
-            "client_secret": "fixture-password-1",
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-        }
+CLIENT = {
+    "web": {
+        "client_id": "fixture-client-1",
+        "client_secret": "fixture-password-1",
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
     }
-    path = tmp_path / "client.json"
-    path.write_text(json.dumps(client))
-    redirect = "https://cal.example.net/google/callback"
-    monkeypatch.setenv("CAL_MIRROR_GOOGLE_CLIENT", str(path))
-    monkeypatch.setenv("CAL_MIRROR_OAUTH_REDIRECT", redirect)
-    flow = get_flow()
+}
+
+
+class FakeRequest:
+    base_url = "https://cal.example.net/"
+
+
+def test_get_flow_prefers_stored_client_and_derives_redirect(monkeypatch):
+    monkeypatch.delenv("CAL_MIRROR_GOOGLE_CLIENT", raising=False)
+    monkeypatch.delenv("CAL_MIRROR_OAUTH_REDIRECT", raising=False)
+    store = FakeStore()
+    store.secrets["google_client"] = json.dumps(CLIENT)
+    flow = get_flow(FakeRequest(), store)
     assert (isinstance(flow, Flow), flow.redirect_uri, flow.oauth2session.scope) == (
         True,
-        redirect,
+        "https://cal.example.net/google/callback",
         [CALENDAR_SCOPE],
     )
+
+
+def test_get_flow_falls_back_to_file_and_env_redirect(monkeypatch, tmp_path):
+    path = tmp_path / "client.json"
+    path.write_text(json.dumps(CLIENT))
+    monkeypatch.setenv("CAL_MIRROR_GOOGLE_CLIENT", str(path))
+    monkeypatch.setenv("CAL_MIRROR_OAUTH_REDIRECT", "https://x.example.net/google/callback")
+    flow = get_flow(FakeRequest(), FakeStore())
+    assert flow.redirect_uri == "https://x.example.net/google/callback"
+
+
+def test_save_client_stores_it_and_hides_the_secret():
+    store = FakeStore()
+    client = make_client(store)
+    response = client.post("/google/client", data={"client_id": " id-1 ", "client_secret": "s-1"})
+    saved = json.loads(store.secrets["google_client"])["web"]
+    assert (response.status_code, saved["client_id"], saved["client_secret"]) == (
+        303,
+        "id-1",
+        "s-1",
+    )
+    page = client.get("/google").text
+    assert "s-1" not in page and "Connect Google" in page
+
+
+def test_save_client_requires_both_fields():
+    store = FakeStore()
+    response = make_client(store).post("/google/client", data={"client_id": "id-1"})
+    assert (response.status_code, "google_client" in store.secrets) == (400, False)
+
+
+def test_page_without_client_hides_connect_button():
+    page = make_client(FakeStore()).get("/google").text
+    assert "Connect Google" not in page and 'name="client_id"' in page
 
 
 def test_connect_without_config_shows_a_readable_error(monkeypatch):
@@ -284,7 +323,7 @@ def test_connect_without_config_shows_a_readable_error(monkeypatch):
     client.cookies.set("cal_mirror_session", "fixture-session-1")
     response = client.get("/google/connect")
     assert response.status_code == 500
-    assert "CAL_MIRROR_GOOGLE_CLIENT is not set" in response.text
+    assert "Enter your Google OAuth client" in response.text
 
 
 def test_stylesheet_is_served_without_sign_in():

@@ -256,14 +256,6 @@ def test_main_exits_when_dsn_is_unset(monkeypatch: pytest.MonkeyPatch) -> None:
     assert str(raised.value) == "CAL_MIRROR_DSN is not set"
 
 
-def test_main_exits_when_client_path_is_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CAL_MIRROR_DSN", "postgresql://localhost/cal_mirror")
-    monkeypatch.setenv("CAL_MIRROR_GOOGLE_CLIENT", "")
-    with pytest.raises(SystemExit) as raised:
-        main()
-    assert str(raised.value) == "CAL_MIRROR_GOOGLE_CLIENT is not set"
-
-
 def test_main_exits_with_cipher_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     client = tmp_path / "client.json"
     client.write_text("{}\n")
@@ -311,8 +303,8 @@ def test_main_wires_store_serve_and_redacts_token(
             self.value: str | None = None
 
         def get_secret(self, name: str) -> str | None:
-            assert name == "google_token"
-            return self.value
+            assert name in ("google_token", "google_client")
+            return self.value if name == "google_token" else None
 
     def fake_pg(dsn: str, box: object) -> FakeStore:
         seen["dsn"] = dsn

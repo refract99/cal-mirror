@@ -261,6 +261,21 @@ def _required(name: str) -> str:
     return value
 
 
+def _read_client_file(path: str) -> dict:
+    """The optional client file; the client normally comes from the web app's Google page."""
+    if path == "":
+        return {}
+    try:
+        config = json.loads(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as err:
+        raise SystemExit(f"CAL_MIRROR_GOOGLE_CLIENT is unreadable: {type(err).__name__}") from None
+    if not isinstance(config, dict):
+        raise SystemExit("CAL_MIRROR_GOOGLE_CLIENT is unreadable: not an object")
+    return config
+
+
 def _client_secret(config: object) -> str:
     if not isinstance(config, dict):
         return ""
@@ -285,17 +300,12 @@ def _remember_google(secrets: list[str], payload: object) -> None:
 
 def main() -> None:
     dsn = _required("CAL_MIRROR_DSN")
-    client_path = _required("CAL_MIRROR_GOOGLE_CLIENT")
+    client_path = os.environ.get("CAL_MIRROR_GOOGLE_CLIENT", "")
     try:
         box = cipher_from_env(os.environ)
     except ValueError as exc:
         raise SystemExit(str(exc)) from None
-    try:
-        client_config = json.loads(Path(client_path).read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as err:
-        raise SystemExit(f"CAL_MIRROR_GOOGLE_CLIENT is unreadable: {type(err).__name__}") from None
-    if not isinstance(client_config, dict):
-        raise SystemExit("CAL_MIRROR_GOOGLE_CLIENT is unreadable: not an object")
+    client_config = _read_client_file(client_path)
     store = PgStore(dsn, box)
     secrets = [
         os.environ["CAL_MIRROR_SECRET_KEY"],
@@ -308,8 +318,15 @@ def main() -> None:
         token = store.get_secret("google_token")
         if token is None or token == "":
             return None
+        config = client_config
+        stored = store.get_secret("google_client")
+        if stored:
+            config = json.loads(stored)
+            secrets[2:3] = [_client_secret(config)]
+        if not config:
+            return None
         _remember_google(secrets, json.loads(token))
-        return GoogleCalendar(build_service(token, client_config))
+        return GoogleCalendar(build_service(token, config))
 
     stop_event = threading.Event()
 

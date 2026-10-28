@@ -8,14 +8,13 @@ You need Docker with the Compose plugin, and a Google OAuth client ([google-oaut
 git clone https://github.com/refract99/cal-mirror
 cd cal-mirror
 sh deploy/compose/init.sh          # writes .env with fresh secrets
-cp ~/Downloads/client_secret_*.json google-client.json
 docker compose up -d --build
 ```
 
 Then open <https://localhost:8443>. The certificate is self-signed and made on first start, so your browser warns once; continue past it.
 
 1. **Set a password** (first visit), then turn on 2FA (TOTP) under the account page. Save the recovery codes.
-2. **Connect Google.** Sign in with the account whose calendars you want to mirror and allow access. You continue past the "unverified app" warning.
+2. **Connect Google.** On the Google page, paste your OAuth client ID and secret once (they are stored encrypted), then press Connect Google. Sign in with the account whose calendars you want to mirror and allow access. You continue past the "unverified app" warning.
 3. **Pick calendars:** the main calendar, the secondary calendars to mirror, and the default calendar for copies.
 4. **Add rules** (optional) and set your **ntfy** server and topic in settings to receive alerts.
 5. The worker runs every 5 minutes. The status page shows the last good sync.

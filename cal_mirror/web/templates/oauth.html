@@ -4,9 +4,28 @@
   <h1>Google account</h1>
   {% if message %}
   <p id="oauth-error">{{ message }}</p>
-  <a href="/google/connect">Try again</a>
+  <a class="button" href="/google/connect">Try again</a>
+  <a class="button-link" href="/google">Google client settings</a>
   {% else %}
-  <p data-state="{{ state|lower }}" id="google-state">{{ state }}</p>
-  <a href="/google/connect">{% if state == "Connect" %}Connect Google{% else %}Reconnect Google{% endif %}</a>
+  <section>
+    <p data-state="{{ state|lower }}" id="google-state">{{ state }}</p>
+    {% if has_client %}
+    <p><a class="button" href="/google/connect">{% if state == "Connect" %}Connect Google{% else %}Reconnect Google{% endif %}</a></p>
+    {% endif %}
+  </section>
+  <section id="google-client">
+    <h2>{% if has_client %}Replace the OAuth client{% else %}Set up the OAuth client{% endif %}</h2>
+    <p>Create a <strong>Web application</strong> OAuth client in the Google Cloud console and add this
+      authorized redirect URI:</p>
+    <p><code>{{ redirect_uri }}</code></p>
+    <form method="post" action="/google/client">
+      <label>Client ID
+        <input type="text" name="client_id" autocomplete="off" required></label>
+      <label>Client secret
+        <input type="password" name="client_secret" autocomplete="off" required></label>
+      <button type="submit">Save client</button>
+    </form>
+    <p>The secret is stored encrypted and is never shown again.</p>
+  </section>
   {% endif %}
 {% endblock %}

@@ -271,6 +271,16 @@ button:focus-visible, input[type="submit"]:focus-visible, .button:focus-visible 
   outline-offset: 2px;
 }
 
+.button-link { margin-left: 0.75rem; font-size: 0.875rem; }
+code {
+  font-family: var(--font-mono);
+  background: var(--bg-surface-subtle);
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+  word-break: break-all;
+}
+#google-client form { padding: 0; border: 0; box-shadow: none; }
+
 /* --- Tables --- */
 .table-wrapper {
   width: 100%;
