@@ -44,6 +44,13 @@ def _placement_row(placement) -> dict:
     return {"kind": kind, "value": value, "calendar": ""}
 
 
+def _calendar_names(store) -> dict[str, str]:
+    try:
+        return {c.id: c.summary for c in store.list_calendars() if c.summary}
+    except AttributeError:
+        return {}
+
+
 def _render(request, store, status_code=200, message="", placement=None):
     rules = store.list_rules()
     rows = [
@@ -64,6 +71,7 @@ def _render(request, store, status_code=200, message="", placement=None):
             "count": len(rows),
             "kinds": KINDS,
             "calendars": store.get_settings().secondary_calendars,
+            "names": _calendar_names(store),
             "message": message,
             "placement": placement,
             "current": current,

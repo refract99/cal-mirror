@@ -369,3 +369,14 @@ def test_signed_out_redirects():
     r = make_client(FakeStore(), signed_in=False).get("/rules", follow_redirects=False)
     assert r.status_code == 303
     assert r.headers["location"] == "/signin"
+
+
+def test_rules_page_shows_calendar_names_not_ids() -> None:
+    from cal_mirror.model import CalendarInfo
+
+    store = FakeStore()
+    store.list_calendars = lambda: [
+        CalendarInfo(id=CALENDARS[0], summary="Blocksentience", access_role="owner")
+    ]
+    html = make_client(store).get("/rules").text
+    assert f'value="{CALENDARS[0]}"' in html and ">Blocksentience</option>" in html

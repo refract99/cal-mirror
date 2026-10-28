@@ -11,7 +11,7 @@
 <section>
   <p>{% if moves == 1 %}1 future copy will move{% else %}{{ moves }} future copies will move{% endif %} to another calendar.</p>
   <ol>
-    {% for r in proposed %}<li>{{ r.kind }}: {{ r.value }} &rarr; {{ r.calendar_id }}</li>
+    {% for r in proposed %}<li>{{ r.kind }}: {{ r.value }} &rarr; {{ names.get(r.calendar_id, r.calendar_id) }}</li>
     {% endfor %}
   </ol>
   <form method="post" action="/rules/requests/{{ current.id }}/confirm"><button type="submit">Confirm</button></form>
@@ -45,7 +45,7 @@
       <td>
         <select name="calendar_{{ i }}">
           {% if blank %}<option value=""></option>{% endif %}
-          {% for c in calendars %}<option value="{{ c }}"{% if c == row.calendar %} selected{% endif %}>{{ c }}</option>
+          {% for c in calendars %}<option value="{{ c }}"{% if c == row.calendar %} selected{% endif %}>{{ names.get(c, c) }}</option>
           {% endfor %}
         </select>
       </td>
