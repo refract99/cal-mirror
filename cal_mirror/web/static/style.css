@@ -164,7 +164,7 @@ a { color: var(--accent); }
 .auth-page .container { max-width: 420px; margin-top: 5vh; }
 
 /* --- Cards & Panels --- */
-.panel, fieldset, #sync, #sync-now, #counts, #placements, #notices {
+.panel, fieldset, #sync, #sync-now, #decisions, #counts, #placements, #notices {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);

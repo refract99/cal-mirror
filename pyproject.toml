@@ -1,6 +1,6 @@
 [project]
 name = "cal-mirror"
-version = "0.1.9"
+version = "0.1.10"
 description = "Google Calendar mirror: BLOCKED events on main, rule-filed copies, meeting checks, archive and cleanup."
 readme = "README.md"
 requires-python = ">=3.13,<3.14"

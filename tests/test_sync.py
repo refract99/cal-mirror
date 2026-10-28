@@ -504,3 +504,20 @@ def test_boardy_only_setup_copies_only_boardy_events_even_when_rule_comes_later(
     run_once(store, calendar, note, clock)
     assert store.get_link(f"main@x/{boardy['id']}").calendar_id == "home@x"
     assert store.get_link(f"main@x/{other['id']}") is None
+
+
+def test_status_records_why_each_main_event_was_or_was_not_copied():
+    import json
+
+    from cal_mirror.model import RULE_ORGANIZER
+
+    store, state, clock, note, calendar = _world(default_calendar="")
+    store.save_rules([Rule(1, RULE_ORGANIZER, "boardy@boardy.ai", "home@x")])
+    state.add_event("main@x", _timed("Boardy intro", organizer={"email": "boardy@boardy.ai"}))
+    state.add_event("main@x", _timed("Other", organizer={"email": "a@b.c"}))
+    state.add_event("main@x", _timed("Free one", transparency="transparent"))
+    run_once(store, calendar, note, clock)
+    verdicts = {r["title"]: r["verdict"] for r in json.loads(store.get_meta("event_decisions"))}
+    assert verdicts["Boardy intro"].startswith("copied to ")
+    assert verdicts["Other"] == "not copied: no rule matched (organizer a@b.c)"
+    assert verdicts["Free one"] == "not copied: shown as Free, not Busy"

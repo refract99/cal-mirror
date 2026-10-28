@@ -50,6 +50,31 @@ def _notice_view(item: dict, zone: ZoneInfo) -> dict[str, str]:
     }
 
 
+def _decision_views(store, zone: ZoneInfo) -> list[dict[str, str]]:
+    raw = store.get_meta("event_decisions")
+    try:
+        items = json.loads(raw) if raw else []
+    except json.JSONDecodeError:
+        return []
+    views = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        start = str(item.get("start", ""))
+        try:
+            start = _format_time(datetime.fromisoformat(start), zone)
+        except ValueError:
+            pass
+        views.append(
+            {
+                "title": str(item.get("title", "")),
+                "start": start,
+                "verdict": str(item.get("verdict", "")),
+            }
+        )
+    return views
+
+
 @router.get("/status")
 def status_page(
     request: Request,
@@ -63,6 +88,7 @@ def status_page(
     zone = ZoneInfo(settings.time_zone)
     notices = [_notice_view(item, zone) for item in _load_notices(store)]
     context = {
+        "decisions": _decision_views(store, zone),
         "last_good_sync": (
             _format_time(status.last_good_sync, zone) if status.last_good_sync else "never"
         ),

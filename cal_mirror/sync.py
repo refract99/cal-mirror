@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from urllib.parse import quote
 
+from cal_mirror import explain
 from cal_mirror.alerts import step_alert
 from cal_mirror.checks import notice_text, plan_notices, summary_text
 from cal_mirror.model import (
@@ -31,6 +32,7 @@ from cal_mirror.model import (
     Rule,
     Settings,
     Status,
+    is_mirror,
     source_key,
 )
 from cal_mirror.plan_blocked import plan_blocked
@@ -166,6 +168,7 @@ def _execute(
                 run.failure = FAIL_API
                 failed.add(cid)
     main = run.settings.main_calendar
+    _record_decisions(store, run.settings, changes.get(main, []), rules, listed, now)
     if not first and main in changes and main not in failed:
         _notices(store, notifier, run, changes[main], events, now, first)
     elif first and run.failure == "":
@@ -228,6 +231,28 @@ def _read_one(
         log.info("%s", SyncTokenExpired.__name__)
         store.set_sync_token(cid, None)
         return calendar.list_changes(cid, None, time_min=now)
+
+
+def _record_decisions(
+    store: Store,
+    settings: Settings,
+    main_changes: list[Event],
+    rules: list[Rule],
+    listed: list[CalendarInfo],
+    now: datetime,
+) -> None:
+    names = {item.id: item.summary for item in listed if item.summary}
+    verdicts = {
+        source_key(event): explain.verdict(
+            event, store.get_link(source_key(event)), rules, settings, names
+        )
+        for event in main_changes
+        if not is_mirror(event)
+    }
+    if verdicts:
+        store.set_meta(
+            explain.KEY, explain.merge(store.get_meta(explain.KEY), main_changes, verdicts, now)
+        )
 
 
 def _link_maps(store: Store) -> tuple[dict[str, Link], dict[str, Link]]:

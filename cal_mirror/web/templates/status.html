@@ -38,6 +38,23 @@
   <p>No counts yet.</p>
   {% endif %}
 </section>
+<section id="decisions">
+  <h2>Upcoming main-calendar events</h2>
+  {% if decisions %}
+  <div class="table-wrapper">
+  <table>
+    <thead><tr><th>When</th><th>Title</th><th>What happened</th></tr></thead>
+    <tbody>
+    {% for d in decisions %}
+      <tr><td>{{ d.start }}</td><td>{{ d.title }}</td><td>{{ d.verdict }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>Nothing recorded yet. Press Sync now on the Settings page.</p>
+  {% endif %}
+</section>
 <section id="placements">
   <h2>Default placements</h2>
   {% if placements %}
