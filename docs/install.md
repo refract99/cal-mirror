@@ -44,10 +44,23 @@ Generate the Fernet key:
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
+Generate the setup code, which the first-run page `/setup` asks for:
+
+```sh
+python -c "import secrets; print(secrets.token_urlsafe(24))"
+```
+
 ```sh
 kubectl -n cal-mirror create secret generic cal-mirror-secrets \
   --from-literal=secret-key=<fernet key> \
-  --from-literal=pg-password=<password>
+  --from-literal=pg-password=<password> \
+  --from-literal=setup-code=<setup code>
+```
+
+The setup code reaches the app as `CAL_MIRROR_SETUP_CODE`. Read it back with:
+
+```sh
+kubectl -n cal-mirror get secret cal-mirror-secrets -o jsonpath='{.data.setup-code}' | base64 -d
 ```
 
 ## 5. Archive folder
@@ -80,6 +93,7 @@ kubectl -n cal-mirror logs deploy/cal-mirror-worker
 | --- | --- |
 | `HOST_NAME` | DNS name of the web app; goes into the certificate. |
 | `OAUTH_REDIRECT` | Google OAuth redirect URI, ending `/google/callback`. |
+| `SIGNIN_REDIRECT` | Google sign-in redirect URI, ending `/signin/google/callback`. |
 | `LAN_CIDR` | Network allowed to reach the web app. |
 | `VPN_CIDR` | VPN network allowed to reach the web app. |
 | `TLS_ISSUER_KIND` | `ClusterIssuer` (DNS-01) or `Issuer` (self-signed). |
@@ -93,6 +107,9 @@ kubectl -n cal-mirror logs deploy/cal-mirror-worker
 | `namespace` | Namespace for everything (`kustomization.yaml`). |
 | registry | `newName` of both images (`kustomization.yaml`). |
 | tag | `newTag` of both images (`kustomization.yaml`). |
+
+The Google OAuth client needs both redirect URIs: `https://<HOST_NAME>/google/callback`
+and `https://<HOST_NAME>/signin/google/callback`.
 
 ## Certificate renewal
 
