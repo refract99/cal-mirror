@@ -216,8 +216,6 @@ class AuthRecord:
     password_hash: str = ""
     totp_enabled: bool = False
     recovery_hashes: tuple[str, ...] = ()
-    failures: int = 0
-    locked_until: datetime | None = None
 
 
 @dataclass(frozen=True)

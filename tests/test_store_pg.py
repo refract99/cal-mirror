@@ -329,13 +329,10 @@ def test_secrets_round_trip(store: PgStore, box: FakeBox, pg_dsn: str) -> None:
 
 
 def test_auth_round_trip(store: PgStore, pg_dsn: str) -> None:
-    locked = datetime(2026, 11, 2, 17, tzinfo=UTC)
     saved = AuthRecord(
         password_hash="argon2hash",
         totp_enabled=True,
         recovery_hashes=("h1", "h2"),
-        failures=4,
-        locked_until=locked,
     )
     store.save_auth(saved)
     assert store.get_auth() == saved
@@ -343,6 +340,23 @@ def test_auth_round_trip(store: PgStore, pg_dsn: str) -> None:
         data = conn.execute("SELECT data FROM state WHERE name = %s", ("auth",)).fetchone()[0]
     assert data["password_hash"] == "argon2hash"
     assert data["recovery_hashes"] == ["h1", "h2"]
+    assert "failures" not in data
+    assert "locked_until" not in data
+
+
+def test_old_auth_row_with_lock_keys_still_loads(store: PgStore, pg_dsn: str) -> None:
+    old = {
+        "password_hash": "argon2hash",
+        "totp_enabled": True,
+        "recovery_hashes": ["h1"],
+        "failures": 4,
+        "locked_until": "2026-11-02T17:00:00+00:00",
+    }
+    with psycopg.connect(pg_dsn) as conn:
+        conn.execute("INSERT INTO state (name, data) VALUES (%s, %s)", ("auth", Jsonb(old)))
+    assert store.get_auth() == AuthRecord(
+        password_hash="argon2hash", totp_enabled=True, recovery_hashes=("h1",)
+    )
 
 
 def test_sessions_round_trip(store: PgStore) -> None:

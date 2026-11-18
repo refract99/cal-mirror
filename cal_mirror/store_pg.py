@@ -166,20 +166,15 @@ def _auth_out(a: AuthRecord) -> dict[str, object]:
         "password_hash": a.password_hash,
         "totp_enabled": a.totp_enabled,
         "recovery_hashes": list(a.recovery_hashes),
-        "failures": a.failures,
-        "locked_until": _dt_out(a.locked_until),
     }
 
 
 def _auth_in(data: Mapping[str, object]) -> AuthRecord:
     blank = AuthRecord()
-    locked = blank.locked_until if "locked_until" not in data else _dt_in(data["locked_until"])
     return AuthRecord(
         password_hash=_field(data, "password_hash", blank.password_hash),
         totp_enabled=_field(data, "totp_enabled", blank.totp_enabled),
         recovery_hashes=_tuple_field(data, "recovery_hashes", blank.recovery_hashes),
-        failures=_field(data, "failures", blank.failures),
-        locked_until=locked,
     )
 
 
