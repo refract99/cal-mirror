@@ -25,6 +25,7 @@ from cal_mirror.web import (
     page_settings,
     page_signin,
     page_status,
+    signin_guard,
 )
 from cal_mirror.web.deps import SESSION_COOKIE, session_hash, templates
 from cal_mirror.web.page_oauth import FlowConfigError
@@ -100,10 +101,16 @@ def create_app(store: Store, clock: Clock | None = None) -> FastAPI:
             now = request.app.state.clock.now()
             if request.app.state.store.session_valid(session_hash(token), now):
                 request.state.user = "owner"
-        if getattr(request.state, "user", None) is None and (
-            request.url.path not in PUBLIC_PATHS and not request.url.path.startswith(STATIC_PREFIX)
-        ):
+        path = request.url.path
+        exempt = path in PUBLIC_PATHS or path.startswith(STATIC_PREFIX)
+        if getattr(request.state, "user", None) is None and not exempt:
             response = RedirectResponse("/signin", status_code=303)
+        elif (
+            not exempt
+            and path not in signin_guard.ENROLLMENT_PATHS
+            and not signin_guard.second_factor_enrolled(request.app.state.store)
+        ):
+            response = RedirectResponse(signin_guard.ENROLL_PATH, status_code=303)
         else:
             response = await call_next(request)
         return response

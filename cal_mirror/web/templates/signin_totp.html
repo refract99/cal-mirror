@@ -5,8 +5,11 @@
 {% block content %}
 <h1>Second factor</h1>
 {% if error %}<p>{{ error }}</p>{% endif %}
+{% if totp_enabled is not defined or totp_enabled %}
 <form method="post">
   <label>Code or recovery code <input type="text" name="code" autocomplete="one-time-code" required></label>
   <button type="submit">Sign in</button>
 </form>
+{% endif %}
+{% if passkeys %}{% include "signin_passkey.html" ignore missing %}{% endif %}
 {% endblock %}

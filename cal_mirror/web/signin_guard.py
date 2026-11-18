@@ -17,6 +17,7 @@ Model and store additions that go with this module (owned by the same intent):
   `Store.set_google_link(link: GoogleLink | None) -> None` (None unlinks).
 """
 
+import os
 import secrets
 import threading
 from dataclasses import dataclass, field
@@ -26,6 +27,7 @@ from typing import Literal
 from fastapi import Request, Response
 
 from cal_mirror.ports import Store
+from cal_mirror.web import deps
 from cal_mirror.web.deps import SESSION_COOKIE, session_hash
 
 SESSION_SECONDS = 43200
@@ -152,7 +154,7 @@ def complete_signin(request: Request, response: Response) -> None:
 
 def second_factor_enrolled(store: Store) -> bool:
     """True when TOTP is on or at least one passkey is registered."""
-    raise NotImplementedError
+    return store.get_auth().totp_enabled or bool(store.list_passkeys())
 
 
 def render_signin(
@@ -163,7 +165,14 @@ def render_signin(
     Always passes `google_linked` (bool), `totp_enabled` (bool) and `passkeys`
     (`Store.list_passkeys()`), plus `context` (for example `error`).
     """
-    raise NotImplementedError
+    store = request.app.state.store
+    ctx: dict[str, object] = {
+        "google_linked": store.get_google_link() is not None,
+        "totp_enabled": store.get_auth().totp_enabled,
+        "passkeys": store.list_passkeys(),
+        **context,
+    }
+    return deps.templates.TemplateResponse(request, name, ctx, status_code=status_code)
 
 
 def render_account(request: Request, status_code: int = 200, **context: object) -> Response:
@@ -173,9 +182,21 @@ def render_account(request: Request, status_code: int = 200, **context: object) 
     (`Store.get_google_link()`) and `signin_redirect` (`signin_redirect_uri(request)`), plus
     `context` (for example `error`).
     """
-    raise NotImplementedError
+    store = request.app.state.store
+    ctx: dict[str, object] = {
+        "enabled": store.get_auth().totp_enabled,
+        "passkeys": store.list_passkeys(),
+        "google_link": store.get_google_link(),
+        "signin_redirect": signin_redirect_uri(request),
+        **context,
+    }
+    return deps.templates.TemplateResponse(
+        request, "account_2fa.html", ctx, status_code=status_code
+    )
 
 
 def signin_redirect_uri(request: Request) -> str:
     """`CAL_MIRROR_SIGNIN_REDIRECT`, else `<request base URL>signin/google/callback`."""
-    raise NotImplementedError
+    return (
+        os.environ.get("CAL_MIRROR_SIGNIN_REDIRECT") or f"{request.base_url}signin/google/callback"
+    )

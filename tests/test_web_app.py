@@ -3,6 +3,7 @@ import ipaddress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pyotp
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -95,7 +96,8 @@ def test_signin_when_password_is_set():
     assert response.status_code == 200
 
 
-def test_setup_when_auth_is_empty():
+def test_setup_when_auth_is_empty(monkeypatch):
+    monkeypatch.setenv("CAL_MIRROR_SETUP_CODE", "fixture-setup-code")
     store, _, client = _client()
     store.save_auth(AuthRecord())
     response = client.get("/setup")
@@ -104,6 +106,7 @@ def test_setup_when_auth_is_empty():
 
 def test_valid_session_opens_status_and_root():
     store, clock, client = _client()
+    store.save_auth(AuthRecord(totp_enabled=True))
     store.create_session(session_hash(SESSION), clock.now() + timedelta(hours=1))
     client.cookies.set(SESSION_COOKIE, SESSION)
     status = client.get("/status")
@@ -132,12 +135,15 @@ def test_unknown_session_redirects_to_signin():
 
 
 def test_password_sign_in_sets_session_cookie():
-    store, _, client = _client()
+    store, clock, client = _client()
     store.save_auth(AuthRecord(password_hash=hash_password(PASSWORD)))
     signed_in = client.post("/signin", data={"password": PASSWORD})
     assert signed_in.status_code == 303
     assert signed_in.headers["location"] == "/status"
     assert signed_in.cookies.get(SESSION_COOKIE)
+    client.post("/account/2fa", data={"action": "enable"})
+    code = pyotp.TOTP(store.get_secret("totp_secret")).at(clock.now())
+    client.post("/account/2fa", data={"action": "confirm", "code": code})
     status = client.get("/status")
     assert status.status_code == 200
 
