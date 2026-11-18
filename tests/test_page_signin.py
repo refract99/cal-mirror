@@ -38,6 +38,7 @@ class FakeStore:
         self.auth = auth or AuthRecord()
         self.secrets = {}
         self.sessions = {}
+        self.passkeys = []
         self.saves = 0
 
     def get_auth(self):
@@ -68,6 +69,12 @@ class FakeStore:
 
     def delete_session(self, token_hash):
         self.sessions.pop(token_hash, None)
+
+    def list_passkeys(self):
+        return list(self.passkeys)
+
+    def get_google_link(self):
+        return None
 
 
 class Env:
@@ -216,7 +223,7 @@ def test_right_password_without_2fa_opens_session():
     env.signin("wrong-password-1")
     r = env.signin()
     assert r.status_code == 303
-    assert r.headers["location"] == "/status"
+    assert r.headers["location"] == "/account/2fa"
     token = r.cookies[SESSION_COOKIE]
     assert list(env.store.sessions) == [session_hash(token)]
     assert (env.store.sessions[session_hash(token)] - START).total_seconds() == SESSION_SECONDS
@@ -369,8 +376,19 @@ def test_account_confirm_wrong_then_valid():
     assert env.store.auth.totp_enabled
 
 
+def test_account_disable_without_passkey_is_refused():
+    env = make_2fa_env(recovery=["abcdef0123"])
+    r = env.client.post("/account/2fa", data={"action": "disable", "code": env.totp_now()})
+    assert r.status_code == 400
+    assert "Turning off TOTP would leave no second factor." in r.text
+    assert env.store.auth.totp_enabled
+    assert env.store.auth.recovery_hashes
+    assert env.store.get_secret("totp_secret") is not None
+
+
 def test_account_disable_wrong_then_valid():
     env = make_2fa_env(recovery=["abcdef0123"])
+    env.store.passkeys.append(object())
     wrong = "000000" if env.totp_now() != "000000" else "111111"
     r = env.client.post("/account/2fa", data={"action": "disable", "code": wrong})
     assert r.status_code == 400

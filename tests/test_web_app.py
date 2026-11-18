@@ -139,7 +139,7 @@ def test_password_sign_in_sets_session_cookie():
     store.save_auth(AuthRecord(password_hash=hash_password(PASSWORD)))
     signed_in = client.post("/signin", data={"password": PASSWORD})
     assert signed_in.status_code == 303
-    assert signed_in.headers["location"] == "/status"
+    assert signed_in.headers["location"] == "/account/2fa"
     assert signed_in.cookies.get(SESSION_COOKIE)
     client.post("/account/2fa", data={"action": "enable"})
     code = pyotp.TOTP(store.get_secret("totp_secret")).at(clock.now())

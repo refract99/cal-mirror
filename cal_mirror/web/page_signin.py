@@ -31,6 +31,9 @@ from cal_mirror.web.signin_guard import (
     is_locked,
     pending_hash,
     record_failure,
+    render_account,
+    render_signin,
+    second_factor_enrolled,
 )
 
 router = APIRouter()
@@ -67,13 +70,13 @@ def _page(request: Request, name: str, status_code: int = 200, **context: object
 
 
 def _locked_page(request: Request, name: str) -> Response:
-    return _page(request, name, 429, error=LOCK_MESSAGE)
+    return render_signin(request, name, 429, error=LOCK_MESSAGE)
 
 
 def _fail(request: Request, name: str) -> Response:
     if record_failure(request):
         return _locked_page(request, name)
-    return _page(request, name, 401, error=FAILURE_MESSAGE)
+    return render_signin(request, name, 401, error=FAILURE_MESSAGE)
 
 
 def _totp_valid(store: Store, code: str, now: datetime) -> bool:
@@ -129,7 +132,7 @@ def setup_submit(
 def signin_form(request: Request, store: StoreDep) -> Response:
     if not store.get_auth().password_hash:
         return _redirect("/setup")
-    return _page(request, "signin.html")
+    return render_signin(request, "signin.html")
 
 
 @router.post("/signin", response_class=HTMLResponse)
@@ -147,8 +150,8 @@ def signin_submit(
     if not verify_password(auth.password_hash, password):
         return _fail(request, "signin.html")
     now = clock.now()
-    if not auth.totp_enabled:
-        response = _redirect("/status")
+    if not second_factor_enrolled(store):
+        response = _redirect("/account/2fa")
         complete_signin(request, response)
         return response
     pending = secrets.token_urlsafe(32)
@@ -164,7 +167,7 @@ def signin_submit(
 
 @router.get("/signin/totp", response_class=HTMLResponse)
 def totp_form(request: Request) -> Response:
-    return _page(request, "signin_totp.html")
+    return render_signin(request, "signin_totp.html")
 
 
 def _recovery_match(auth: AuthRecord, code: str) -> str | None:
@@ -188,6 +191,8 @@ def totp_submit(
         return _locked_page(request, "signin_totp.html")
     if pending_hash(request) is None:
         return _redirect("/signin")
+    if not auth.totp_enabled:
+        return _fail(request, "signin_totp.html")
     if not _totp_valid(store, code, now):
         used = _recovery_match(auth, code)
         if used is None:
@@ -211,7 +216,7 @@ def signout(request: Request, store: StoreDep) -> Response:
 
 @router.get("/account/2fa", response_class=HTMLResponse)
 def account_form(request: Request, store: StoreDep, user: UserDep) -> Response:
-    return _page(request, "account_2fa.html", enabled=store.get_auth().totp_enabled)
+    return render_account(request)
 
 
 @router.post("/account/2fa", response_class=HTMLResponse)
@@ -233,9 +238,8 @@ def account_submit(
         hashes = tuple(hash_password(c) for c in codes)
         store.save_auth(replace(auth, recovery_hashes=hashes))
         uri = pyotp.TOTP(secret).provisioning_uri(name="owner", issuer_name="cal-mirror")
-        return _page(
+        return render_account(
             request,
-            "account_2fa.html",
             enabled=False,
             setup=True,
             uri=uri,
@@ -244,9 +248,8 @@ def account_submit(
         )
     if action == "confirm" and not enabled:
         if not _totp_valid(store, code, now):
-            return _page(
+            return render_account(
                 request,
-                "account_2fa.html",
                 400,
                 enabled=False,
                 confirming=True,
@@ -256,8 +259,15 @@ def account_submit(
         return _redirect("/account/2fa")
     if action == "disable" and enabled:
         if not _totp_valid(store, code, now):
-            return _page(request, "account_2fa.html", 400, enabled=True, error="Invalid code.")
+            return render_account(request, 400, enabled=True, error="Invalid code.")
+        if not store.list_passkeys():
+            return render_account(
+                request,
+                400,
+                enabled=True,
+                error="Turning off TOTP would leave no second factor.",
+            )
         store.save_auth(replace(auth, totp_enabled=False, recovery_hashes=()))
         store.set_secret(TOTP_STORE_NAME, None)
         return _redirect("/account/2fa")
-    return _page(request, "account_2fa.html", 400, enabled=enabled, error="Unknown action.")
+    return render_account(request, 400, enabled=enabled, error="Unknown action.")

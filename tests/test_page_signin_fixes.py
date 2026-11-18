@@ -97,9 +97,10 @@ def test_pending_cookie_strict_then_session_lax():
 
 
 def test_google_callback_after_signin_reaches_google():
-    env = Env()
+    env = Env(totp=True)
     env.app.dependency_overrides[page_oauth.get_flow] = StubFlow
     env.signin()
+    env.code(env.good())
     env.store.set_meta("oauth_state", "fixture-state-1")
     r = env.client.get("/google/callback?state=fixture-state-1&code=fixture-code-1")
     assert r.status_code == 303
@@ -163,7 +164,7 @@ def test_right_password_without_2fa_resets_counter():
     env.miss_passwords(3)
     r = env.signin()
     assert r.status_code == 303
-    assert r.headers["location"] == "/status"
+    assert r.headers["location"] == "/account/2fa"
     env.assert_full_run_needed()
 
 

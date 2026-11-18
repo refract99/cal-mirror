@@ -149,8 +149,15 @@ def test_criterion_8_password_required() -> None:
     assert wrong.status_code == 401
     right = client.post("/signin", data={"password": PASSWORD})
     assert right.status_code == 303
-    assert right.headers["location"] == "/status"
+    assert right.headers["location"] == "/account/2fa"
     assert SESSION_COOKIE in right.cookies
+    assert client.get("/status").status_code == 303
+    enabled = client.post("/account/2fa", data={"action": "enable"})
+    found = re.search(r"Secret: <code>(\w+)</code>", enabled.text)
+    assert found is not None
+    code = pyotp.TOTP(found.group(1)).at(clk.now())
+    confirmed = client.post("/account/2fa", data={"action": "confirm", "code": code})
+    assert confirmed.status_code == 303
     page = client.get("/status")
     assert page.status_code == 200
 
@@ -216,7 +223,7 @@ def test_criterion_8_lockout() -> None:
     clk.advance(Settings().signin_lock_seconds + 1)
     opened = client.post("/signin", data={"password": PASSWORD})
     assert opened.status_code == 303
-    assert opened.headers["location"] == "/status"
+    assert opened.headers["location"] == "/account/2fa"
 
 
 def test_criterion_9_no_plain_secret(caplog: pytest.LogCaptureFixture, pg_dsn: str) -> None:
