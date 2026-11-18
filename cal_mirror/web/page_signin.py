@@ -1,3 +1,4 @@
+import os
 import secrets
 from dataclasses import replace
 from datetime import datetime, timedelta
@@ -33,6 +34,7 @@ RECOVERY_CODE_COUNT = 10
 TOTP_STORE_NAME = "totp_secret"
 LOCK_MESSAGE = "Sign-in is locked. Try again later."
 FAILURE_MESSAGE = "Wrong password or code."
+SETUP_CODE_ENV = "CAL_MIRROR_SETUP_CODE"
 
 _hasher = PasswordHasher()
 
@@ -95,10 +97,22 @@ def _totp_valid(store: Store, code: str, now: datetime) -> bool:
     return bool(pyotp.TOTP(secret).verify(code.strip(), for_time=now, valid_window=1))
 
 
+def _setup_code() -> str:
+    return os.environ.get(SETUP_CODE_ENV, "")
+
+
+def _setup_unconfigured(request: Request) -> Response:
+    return _page(
+        request, "setup.html", 403, error="The setup code is not configured.", no_form=True
+    )
+
+
 @router.get("/setup", response_class=HTMLResponse)
 def setup_form(request: Request, store: StoreDep) -> Response:
     if store.get_auth().password_hash:
         return _redirect("/signin")
+    if not _setup_code():
+        return _setup_unconfigured(request)
     return _page(request, "setup.html")
 
 
@@ -108,9 +122,15 @@ def setup_submit(
     store: StoreDep,
     password: Annotated[str, Form()],
     confirm: Annotated[str, Form()],
+    setup_code: Annotated[str, Form()] = "",
 ) -> Response:
     if store.get_auth().password_hash:
         return _redirect("/signin")
+    expected = _setup_code()
+    if not expected:
+        return _setup_unconfigured(request)
+    if not secrets.compare_digest(setup_code.encode(), expected.encode()):
+        return _page(request, "setup.html", 403, error="Wrong setup code.")
     if len(password) < MIN_PASSWORD_LENGTH:
         return _page(request, "setup.html", 400, error="Password must be at least 12 characters.")
     if password != confirm:

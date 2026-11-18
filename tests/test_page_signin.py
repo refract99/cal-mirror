@@ -2,6 +2,7 @@ import logging
 from datetime import UTC, datetime
 
 import pyotp
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -19,7 +20,17 @@ from cal_mirror.web.page_signin import (
 )
 
 PASSWORD = "fixture-password-1"
+SETUP_CODE = "fixture-setup-code-1"
 START = datetime(2026, 11, 3, 12, 0, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+def setup_code(monkeypatch):
+    monkeypatch.setenv("CAL_MIRROR_SETUP_CODE", SETUP_CODE)
+
+
+def setup_data(password, confirm, code=SETUP_CODE):
+    return {"password": password, "confirm": confirm, "setup_code": code}
 
 
 class FakeStore:
@@ -65,7 +76,12 @@ class Env:
         app.state.clock = self.clock
         app.include_router(router)
         app.dependency_overrides[current_user] = lambda: "steve"
-        self.client = TestClient(app, base_url="https://testserver", follow_redirects=False)
+        self.client = TestClient(
+            app,
+            base_url="https://testserver",
+            follow_redirects=False,
+            headers={"Origin": "https://testserver"},
+        )
 
     def signin(self, password=PASSWORD):
         return self.client.post("/signin", data={"password": password})
@@ -111,7 +127,7 @@ def test_no_password_post_signin_makes_no_session():
 
 def test_setup_short_password_rejected():
     env = make_env()
-    r = env.client.post("/setup", data={"password": "a" * 11, "confirm": "a" * 11})
+    r = env.client.post("/setup", data=setup_data("a" * 11, "a" * 11))
     assert r.status_code == 400
     assert "Password must be at least 12 characters." in r.text
     assert env.store.saves == 0
@@ -120,7 +136,7 @@ def test_setup_short_password_rejected():
 
 def test_setup_mismatch_rejected():
     env = make_env()
-    r = env.client.post("/setup", data={"password": PASSWORD, "confirm": PASSWORD + "x"})
+    r = env.client.post("/setup", data=setup_data(PASSWORD, PASSWORD + "x"))
     assert r.status_code == 400
     assert "Passwords do not match." in r.text
     assert env.store.saves == 0
@@ -128,7 +144,7 @@ def test_setup_mismatch_rejected():
 
 def test_setup_stores_hash_then_redirects_afterwards():
     env = make_env()
-    r = env.client.post("/setup", data={"password": PASSWORD, "confirm": PASSWORD})
+    r = env.client.post("/setup", data=setup_data(PASSWORD, PASSWORD))
     assert r.status_code == 303
     assert r.headers["location"] == "/signin"
     stored = env.store.auth.password_hash
@@ -140,6 +156,43 @@ def test_setup_stores_hash_then_redirects_afterwards():
     post_again = env.client.post("/setup", data={"password": "other-password-9", "confirm": "x"})
     assert post_again.status_code == 303
     assert env.store.auth.password_hash == stored
+
+
+def test_setup_not_configured_refuses_get_and_post(monkeypatch):
+    monkeypatch.delenv("CAL_MIRROR_SETUP_CODE")
+    env = make_env()
+    page = env.client.get("/setup")
+    assert page.status_code == 403
+    assert "The setup code is not configured." in page.text
+    assert "<form" not in page.text
+    for code in ("", SETUP_CODE):
+        r = env.client.post("/setup", data=setup_data(PASSWORD, PASSWORD, code))
+        assert r.status_code == 403
+        assert "The setup code is not configured." in r.text
+    assert env.store.saves == 0
+    monkeypatch.setenv("CAL_MIRROR_SETUP_CODE", "")
+    assert env.client.get("/setup").status_code == 403
+
+
+def test_setup_missing_or_wrong_code_refused():
+    env = make_env()
+    assert 'name="setup_code"' in env.client.get("/setup").text
+    missing = env.client.post("/setup", data={"password": PASSWORD, "confirm": PASSWORD})
+    assert missing.status_code == 403
+    wrong = env.client.post("/setup", data=setup_data(PASSWORD, PASSWORD, "wrong-code"))
+    assert wrong.status_code == 403
+    assert SETUP_CODE not in wrong.text
+    assert env.store.saves == 0
+    assert not env.store.auth.password_hash
+
+
+def test_setup_password_set_redirects_before_code_check(monkeypatch):
+    env = make_env(with_password())
+    monkeypatch.delenv("CAL_MIRROR_SETUP_CODE")
+    assert env.client.get("/setup").status_code == 303
+    r = env.client.post("/setup", data=setup_data(PASSWORD, PASSWORD, "wrong"))
+    assert r.status_code == 303
+    assert r.headers["location"] == "/signin"
 
 
 def test_wrong_password_counts_failure():
@@ -346,8 +399,8 @@ def test_secrets_not_in_responses_or_logs(caplog):
     caplog.set_level(logging.DEBUG)
     env = make_env()
     bodies = []
-    bodies.append(env.client.post("/setup", data={"password": "short", "confirm": "short"}).text)
-    bodies.append(env.client.post("/setup", data={"password": PASSWORD, "confirm": PASSWORD}).text)
+    bodies.append(env.client.post("/setup", data=setup_data("short", "short")).text)
+    bodies.append(env.client.post("/setup", data=setup_data(PASSWORD, PASSWORD)).text)
     bodies.append(env.client.get("/signin").text)
     bodies.append(env.signin("wrong-password-1").text)
     env.signin()

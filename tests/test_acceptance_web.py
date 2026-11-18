@@ -22,9 +22,15 @@ from cal_mirror.web.deps import SESSION_COOKIE
 from cal_mirror.web.page_signin import LOCK_SECONDS, MAX_FAILURES
 
 PASSWORD = "fixture-password-1"
+SETUP_CODE = "fixture-setup-code-1"
 TOKEN = "fixture-token-1"
 REFRESH = "fixture-refresh-1"
 OAUTH_STATE = "fixture-state-1"
+
+
+@pytest.fixture(autouse=True)
+def setup_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CAL_MIRROR_SETUP_CODE", SETUP_CODE)
 
 
 def new_clock() -> FixedClock:
@@ -51,7 +57,12 @@ def memory_store() -> MemoryStore:
 
 def web_client(store: MemoryStore | PgStore, clk: FixedClock) -> TestClient:
     app = create_app(store, clk)
-    return TestClient(app, base_url="https://testserver", follow_redirects=False)
+    return TestClient(
+        app,
+        base_url="https://testserver",
+        follow_redirects=False,
+        headers={"Origin": "https://testserver"},
+    )
 
 
 def owned_calendar() -> GoogleCalendar:
@@ -129,7 +140,10 @@ def test_criterion_8_password_required() -> None:
     blocked = client.get("/status")
     assert blocked.status_code == 303
     assert blocked.headers["location"] == "/signin"
-    setup = client.post("/setup", data={"password": PASSWORD, "confirm": PASSWORD})
+    setup = client.post(
+        "/setup",
+        data={"password": PASSWORD, "confirm": PASSWORD, "setup_code": SETUP_CODE},
+    )
     assert setup.status_code == 303
     assert setup.headers["location"] == "/signin"
     wrong = client.post("/signin", data={"password": "fixture-wrong-password"})
@@ -145,7 +159,10 @@ def test_criterion_8_password_required() -> None:
 def test_criterion_8_totp_and_recovery_code() -> None:
     clk = new_clock()
     client = web_client(memory_store(), clk)
-    client.post("/setup", data={"password": PASSWORD, "confirm": PASSWORD})
+    client.post(
+        "/setup",
+        data={"password": PASSWORD, "confirm": PASSWORD, "setup_code": SETUP_CODE},
+    )
     signed = client.post("/signin", data={"password": PASSWORD})
     assert signed.status_code == 303
     enabled = client.post("/account/2fa", data={"action": "enable"})
@@ -187,7 +204,10 @@ def test_criterion_8_totp_and_recovery_code() -> None:
 def test_criterion_8_lockout() -> None:
     clk = new_clock()
     client = web_client(memory_store(), clk)
-    client.post("/setup", data={"password": PASSWORD, "confirm": PASSWORD})
+    client.post(
+        "/setup",
+        data={"password": PASSWORD, "confirm": PASSWORD, "setup_code": SETUP_CODE},
+    )
     last = client.post("/signin", data={"password": "fixture-wrong-password"})
     for _ in range(MAX_FAILURES - 1):
         last = client.post("/signin", data={"password": "fixture-wrong-password"})
@@ -211,8 +231,16 @@ def test_criterion_9_no_plain_secret(caplog: pytest.LogCaptureFixture, pg_dsn: s
     clk = new_clock()
     app = create_app(store, clk)
     app.dependency_overrides[page_oauth.get_flow] = lambda: StubFlow()
-    client = TestClient(app, base_url="https://testserver", follow_redirects=False)
-    client.post("/setup", data={"password": PASSWORD, "confirm": PASSWORD})
+    client = TestClient(
+        app,
+        base_url="https://testserver",
+        follow_redirects=False,
+        headers={"Origin": "https://testserver"},
+    )
+    client.post(
+        "/setup",
+        data={"password": PASSWORD, "confirm": PASSWORD, "setup_code": SETUP_CODE},
+    )
     client.post("/signin", data={"password": PASSWORD})
     enabled = client.post("/account/2fa", data={"action": "enable"})
     assert enabled.status_code == 200
