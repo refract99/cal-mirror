@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from google_auth_oauthlib.flow import Flow
 from oauthlib.oauth2 import OAuth2Error
 
-from cal_mirror.model import Status
+from cal_mirror.model import AuthRecord, Status
 from cal_mirror.ports import FixedClock
 from cal_mirror.web.deps import current_user
 from cal_mirror.web.page_oauth import CALENDAR_SCOPE, get_flow, router
@@ -319,6 +319,7 @@ def test_connect_without_config_shows_a_readable_error(monkeypatch):
     monkeypatch.delenv("CAL_MIRROR_GOOGLE_CLIENT", raising=False)
     store = FakeStore()
     store.session_valid = lambda *_: True
+    store.get_auth = lambda: AuthRecord(totp_enabled=True)
     client = TestClient(create_app(store, FixedClock(datetime(2026, 1, 1, tzinfo=UTC))))
     client.cookies.set("cal_mirror_session", "fixture-session-1")
     response = client.get("/google/connect")

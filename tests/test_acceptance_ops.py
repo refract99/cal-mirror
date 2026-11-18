@@ -12,6 +12,7 @@ from cal_mirror.model import (
     REQ_READY,
     REQ_RULES,
     RULE_TITLE_WORD,
+    AuthRecord,
     Rule,
     Settings,
 )
@@ -97,7 +98,13 @@ def _world(tmp_path=None):
 
 def _client(store, clock) -> TestClient:
     app = create_app(store, clock)
-    client = TestClient(app, base_url="https://testserver", follow_redirects=False)
+    client = TestClient(
+        app,
+        base_url="https://testserver",
+        follow_redirects=False,
+        headers={"Origin": "https://testserver"},
+    )
+    store.save_auth(AuthRecord(totp_enabled=True))
     store.create_session(session_hash(TOKEN), clock.now() + timedelta(days=30))
     client.cookies.set(SESSION_COOKIE, TOKEN)
     return client

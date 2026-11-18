@@ -9,7 +9,9 @@ from cal_mirror.model import (
     AlertState,
     AuthRecord,
     CalendarInfo,
+    GoogleLink,
     Link,
+    Passkey,
     PlacementEntry,
     Request,
     Rule,
@@ -43,6 +45,8 @@ class MemoryStore:
         self._secrets: dict[str, str] = {}
         self._auth = AuthRecord()
         self._sessions: dict[str, datetime] = {}
+        self._passkeys: dict[str, Passkey] = {}
+        self._google_link: GoogleLink | None = None
         self._meta: dict[str, str] = {}
 
     def get_settings(self) -> Settings:
@@ -191,6 +195,26 @@ class MemoryStore:
 
     def delete_session(self, token_hash: str) -> None:
         self._sessions.pop(token_hash, None)
+
+    def list_passkeys(self) -> list[Passkey]:
+        return sorted(self._passkeys.values(), key=lambda p: (p.created, p.credential_id))
+
+    def add_passkey(self, passkey: Passkey) -> None:
+        self._passkeys[passkey.credential_id] = passkey
+
+    def set_passkey_sign_count(self, credential_id: str, sign_count: int) -> None:
+        current = self._passkeys.get(credential_id)
+        if current is not None:
+            self._passkeys[credential_id] = dataclasses.replace(current, sign_count=sign_count)
+
+    def delete_passkey(self, credential_id: str) -> None:
+        self._passkeys.pop(credential_id, None)
+
+    def get_google_link(self) -> GoogleLink | None:
+        return self._google_link
+
+    def set_google_link(self, link: GoogleLink | None) -> None:
+        self._google_link = link
 
     def get_meta(self, key: str) -> str | None:
         return self._meta.get(key)

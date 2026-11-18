@@ -21,10 +21,12 @@
 - [quickstart.md](quickstart.md): running the whole app on one machine with Docker Compose.
 - [page_archive.md](page_archive.md): the archive page.
 - [page_calendars.md](page_calendars.md): the calendars page.
+- [page_google_signin.md](page_google_signin.md): linking a Google account and signing in with it.
 - [page_oauth.md](page_oauth.md): the Google connect and callback routes.
+- [page_passkey.md](page_passkey.md): registering passkeys and signing in with them.
 - [page_rules.md](page_rules.md): the rules page and rule-change requests.
 - [page_settings.md](page_settings.md): the settings page.
-- [page_signin.md](page_signin.md): setup, sign-in, 2FA and lockout.
+- [page_signin.md](page_signin.md): setup code, sign-in, required second factor, lockout and the Origin check.
 - [page_status.md](page_status.md): the status page.
 - [plan_blocked.md](plan_blocked.md): planning BLOCKED events on the main calendar.
 - [plan_copy.md](plan_copy.md): planning main-to-secondary copies.
@@ -32,6 +34,7 @@
 - [requests_runner.md](requests_runner.md): the worker half of rule changes and archives.
 - [rules.md](rules.md): rules that choose the secondary calendar for a copy.
 - [store_memory.md](store_memory.md): the in-memory store for tests.
+- [signin_guard.md](signin_guard.md): the shared sign-in rules: per-address lock, pending sign-in, session.
 - [store_pg.md](store_pg.md): the Postgres store adapter.
 - [sync.md](sync.md): one pass of the mirror, `run_once`.
 - [web_app.md](web_app.md): the FastAPI app built from the page routers.
