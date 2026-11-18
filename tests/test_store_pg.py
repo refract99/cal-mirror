@@ -81,7 +81,8 @@ def test_settings_round_trip(store: PgStore, pg_dsn: str) -> None:
         check_hours=True,
         allowed_hours={0: (time(9), time(17)), 2: (time(10, 30), time(16))},
         web_url="https://cal.example",
-        two_factor=True,
+        signin_failure_limit=3,
+        signin_lock_seconds=120,
     )
     store.save_settings(richer)
     got = store.get_settings()
@@ -391,7 +392,7 @@ def test_migrate_twice(store: PgStore, pg_dsn: str) -> None:
         migrate(conn)
         migrate(conn)
         rows = conn.execute("SELECT name FROM schema_version ORDER BY name").fetchall()
-    assert rows == [("0001_init.sql",)]
+    assert rows == [("0001_init.sql",), ("0002_signin.sql",)]
 
 
 def test_missing_database(box: FakeBox, pg_dsn: str) -> None:

@@ -144,7 +144,8 @@ class Settings:
     check_hours: bool = True
     allowed_hours: Mapping[int, tuple[time, time]] = field(default_factory=dict, compare=False)
     web_url: str = ""
-    two_factor: bool = False
+    signin_failure_limit: int = 5
+    signin_lock_seconds: int = 900
 
 
 @dataclass(frozen=True)
@@ -193,6 +194,21 @@ class Status:
     failure: str = ""
     token_ok: bool = True
     counts: Mapping[str, int] = field(default_factory=dict, compare=False)
+
+
+@dataclass(frozen=True)
+class Passkey:
+    credential_id: str
+    name: str
+    public_key: bytes
+    sign_count: int
+    created: datetime
+
+
+@dataclass(frozen=True)
+class GoogleLink:
+    sub: str
+    email: str
 
 
 @dataclass(frozen=True)

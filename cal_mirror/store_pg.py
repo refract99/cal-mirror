@@ -10,7 +10,9 @@ from cal_mirror.model import (
     AlertState,
     AuthRecord,
     CalendarInfo,
+    GoogleLink,
     Link,
+    Passkey,
     PlacementEntry,
     Request,
     Rule,
@@ -84,7 +86,8 @@ def _settings_out(s: Settings) -> dict[str, object]:
             for day, (start, end) in s.allowed_hours.items()
         },
         "web_url": s.web_url,
-        "two_factor": s.two_factor,
+        "signin_failure_limit": s.signin_failure_limit,
+        "signin_lock_seconds": s.signin_lock_seconds,
     }
 
 
@@ -112,7 +115,8 @@ def _settings_in(data: Mapping[str, object]) -> Settings:
         check_hours=_field(data, "check_hours", blank.check_hours),
         allowed_hours=hours,
         web_url=_field(data, "web_url", blank.web_url),
-        two_factor=_field(data, "two_factor", blank.two_factor),
+        signin_failure_limit=_field(data, "signin_failure_limit", blank.signin_failure_limit),
+        signin_lock_seconds=_field(data, "signin_lock_seconds", blank.signin_lock_seconds),
     )
 
 
@@ -674,6 +678,83 @@ class PgStore:
     def delete_session(self, token_hash: str) -> None:
         def run(conn: psycopg.Connection) -> None:
             conn.execute("DELETE FROM sessions WHERE token_hash = %s", (token_hash,))
+
+        self._call(run)
+
+    def list_passkeys(self) -> list[Passkey]:
+        def run(conn: psycopg.Connection) -> list[Passkey]:
+            rows = conn.execute(
+                """
+                SELECT credential_id, name, public_key, sign_count, created
+                FROM passkeys ORDER BY created, credential_id
+                """
+            ).fetchall()
+            return [
+                Passkey(
+                    credential_id=row[0],
+                    name=row[1],
+                    public_key=bytes(row[2]),
+                    sign_count=row[3],
+                    created=row[4].astimezone(UTC),
+                )
+                for row in rows
+            ]
+
+        return self._call(run)
+
+    def add_passkey(self, passkey: Passkey) -> None:
+        def run(conn: psycopg.Connection) -> None:
+            conn.execute(
+                """
+                INSERT INTO passkeys (credential_id, name, public_key, sign_count, created)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (credential_id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    public_key = EXCLUDED.public_key,
+                    sign_count = EXCLUDED.sign_count,
+                    created = EXCLUDED.created
+                """,
+                (
+                    passkey.credential_id,
+                    passkey.name,
+                    passkey.public_key,
+                    passkey.sign_count,
+                    passkey.created,
+                ),
+            )
+
+        self._call(run)
+
+    def set_passkey_sign_count(self, credential_id: str, sign_count: int) -> None:
+        def run(conn: psycopg.Connection) -> None:
+            conn.execute(
+                "UPDATE passkeys SET sign_count = %s WHERE credential_id = %s",
+                (sign_count, credential_id),
+            )
+
+        self._call(run)
+
+    def delete_passkey(self, credential_id: str) -> None:
+        def run(conn: psycopg.Connection) -> None:
+            conn.execute("DELETE FROM passkeys WHERE credential_id = %s", (credential_id,))
+
+        self._call(run)
+
+    def get_google_link(self) -> GoogleLink | None:
+        def run(conn: psycopg.Connection) -> GoogleLink | None:
+            data = self._load_state(conn, "google_link")
+            if data is None:
+                return None
+            return GoogleLink(sub=data["sub"], email=data["email"])
+
+        return self._call(run)
+
+    def set_google_link(self, link: GoogleLink | None) -> None:
+        def run(conn: psycopg.Connection) -> None:
+            if link is None:
+                conn.execute("DELETE FROM state WHERE name = %s", ("google_link",))
+            else:
+                self._save_state(conn, "google_link", {"sub": link.sub, "email": link.email})
 
         self._call(run)
 
