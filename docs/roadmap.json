@@ -1,0 +1,107 @@
+[
+  {
+    "id": "772db954-f35d-4f56-a3c2-b30f58123618",
+    "project": "cal-mirror",
+    "title": "PRD-01: Sign-in fit for the internet",
+    "requirements": [
+      {
+        "id": "R1",
+        "statement": "While no password is set, `POST /setup` sets the password only when its form field `setup_code` equals the environment variable `CAL_MIRROR_SETUP_CODE`; a missing or wrong code answers 403 and stores nothing."
+      },
+      {
+        "id": "R2",
+        "statement": "When `CAL_MIRROR_SETUP_CODE` is unset or empty, `GET /setup` and `POST /setup` answer 403 with a page saying the setup code is not configured, and no password can be set."
+      },
+      {
+        "id": "R3",
+        "statement": "`deploy/compose/init.sh` writes a fresh random `CAL_MIRROR_SETUP_CODE` into `.env`, and `deploy/k8s/web-deployment.yaml` sets `CAL_MIRROR_SETUP_CODE` from the Secret `cal-mirror-secrets`, key `setup-code`."
+      },
+      {
+        "id": "R4",
+        "statement": "With the right password and no second factor enrolled, `POST /signin` does not give access to the app: every page other than second-factor enrollment and `/signout` redirects to enrollment until a TOTP authenticator or a passkey is confirmed."
+      },
+      {
+        "id": "R5",
+        "statement": "Once a second factor is enrolled, the right password alone never gives a session that reaches `/status`; sign-in continues to the second-factor step."
+      },
+      {
+        "id": "R6",
+        "statement": "The last second factor cannot be removed: turning TOTP off while no passkey is registered, or deleting the last passkey while TOTP is off, answers 400 and changes nothing."
+      },
+      {
+        "id": "R7",
+        "statement": "`Settings` has no `two_factor` field, and a stored settings row that still contains `two_factor` loads without error."
+      },
+      {
+        "id": "R8",
+        "statement": "Failed sign-in attempts (wrong password, wrong code, failed passkey, refused Google sign-in) are counted per client address: after the failure limit from one address, sign-in from that address answers 429 for the lock time without checking credentials, while the right credentials from another address still sign in."
+      },
+      {
+        "id": "R9",
+        "statement": "A completed sign-in clears the failure count and lock of its own client address only."
+      },
+      {
+        "id": "R10",
+        "statement": "The failure limit and the lock time are owner settings on the Settings page, with defaults 5 failures and 900 seconds; a value below 1 is refused with 400 and the stored value is unchanged."
+      },
+      {
+        "id": "R11",
+        "statement": "Every `POST` whose `Origin` header is missing or differs from the app's own origin (the request's scheme, host and port) answers 403 before its handler runs and changes nothing in the store."
+      },
+      {
+        "id": "R12",
+        "statement": "A `POST` whose `Origin` header equals the app's own origin behaves as it does without this check."
+      },
+      {
+        "id": "R13",
+        "statement": "A signed-in owner can register one or more passkeys (WebAuthn, relying party ID = the host the app is reached at) on the account page, see them listed by name and date, and delete each; the store keeps each credential's ID, public key and sign count, never a private key."
+      },
+      {
+        "id": "R14",
+        "statement": "At the second-factor step, a WebAuthn assertion from a registered passkey that is signed over the challenge issued for that pending sign-in completes sign-in; an assertion from an unregistered credential, over any other challenge, or with a non-zero sign count that is not greater than the stored one gives no session and counts as a failed attempt."
+      },
+      {
+        "id": "R15",
+        "statement": "A passkey challenge is accepted at most once and not after its pending sign-in expires."
+      },
+      {
+        "id": "R16",
+        "statement": "A signed-in owner can link a Google account from the account page: the app sends a separate OAuth request on the stored OAuth client with scopes `openid` and `email` only, and stores the account's `sub` and email; a new link replaces the old, and the owner can unlink."
+      },
+      {
+        "id": "R17",
+        "statement": "While a Google account is linked, the sign-in page offers \"Sign in with Google\"; a Google sign-in whose ID token has the linked `sub`, the client ID as audience, a Google issuer and an unexpired time gives a full session with no second-factor step."
+      },
+      {
+        "id": "R18",
+        "statement": "A Google sign-in for any other account, with a state that does not match the one the app issued, or while no account is linked, gives no session, answers 401 and counts as a failed attempt from that client address; with no account linked the sign-in page shows no Google button."
+      },
+      {
+        "id": "R19",
+        "statement": "Linking, unlinking and signing in with Google never read, change or delete the stored calendar grant `google_token` and never request a calendar scope; `/google/connect` still requests the calendar scope only."
+      },
+      {
+        "id": "R20",
+        "statement": "The Google sign-in callback is reachable without a session; its redirect URI is `<app base URL>/signin/google/callback`, overridden by `CAL_MIRROR_SIGNIN_REDIRECT`, and the account page shows the URI the owner must add to the Google client."
+      },
+      {
+        "id": "R21",
+        "statement": "`docs/page_signin.md` documents every sign-in route, the per-address lock rule, the required second factor, passkeys and Google sign-in; `docs/install.md` tells the owner how to set and read `CAL_MIRROR_SETUP_CODE` and which sign-in redirect URI to add to the Google client."
+      }
+    ],
+    "context": "# cal-mirror PRD-01: sign-in fit for the internet\n\ncal-mirror mirrors Google Calendar events between one owner's main and secondary calendars.\nIt has two processes: a worker (`cal_mirror/worker.py`) that talks to Google, and a FastAPI web\napp (`cal_mirror/web/`) where the single owner signs in, connects Google, picks calendars, writes\nrules and changes settings. Both share PostgreSQL through the `Store` protocol.\n\nRead docs/prd.md (the v1 PRD), docs/architecture.md and docs/page_signin.md first. Where this\nPRD differs from them, this PRD wins, and the docs change with the code.\n\n## Why this release\n\nThe web app is LAN/VPN-only today. Roadmap v2 makes it reachable from the internet; this PRD is\nits first row and only hardens sign-in. Exposing the app (public URL, certificate, forwarded\nclient addresses) is the next PRD, and push sync the one after. Nothing in this PRD exposes the\napp or changes the README's \"LAN or VPN only\" statement.\n\nWhat is wrong today, in `cal_mirror/web/page_signin.py`:\n\n- 2FA is optional. A password alone gives a session when TOTP is off.\n- One global failure counter in `AuthRecord` (`failures`, `locked_until`): five wrong\n  attempts from anyone lock the owner out for 900 s. A stranger can keep the owner locked out.\n- `/setup` is public and sets the first password for whoever reaches it first.\n- No form post checks where it came from.\n- TOTP and recovery codes are the only second factors.\n\nThe owner also wants \"Sign in with Google\" as an option beside password + 2FA (decided\n2026-11-16): a sign-in-only OAuth request, separate from the calendar grant, accepted for one\nlinked Google account, and trusted as complete without TOTP or passkey because the app only\ncontrols calendars that same Google account already controls. Password + second factor stays as\nthe way in on a fresh install and when Google sign-in is not possible.\n\n## Where things are\n\n- `cal_mirror/web/app.py`: `create_app(store, clock)`, the session middleware,\n  `PUBLIC_PATHS` (paths reachable without a session), security headers\n  (CSP `default-src 'self'`: scripts must be files under `cal_mirror/web/static/`, no inline\n  script), TLS-only `main()` reading `CAL_MIRROR_*` environment variables.\n- `cal_mirror/web/page_signin.py`: `/setup`, `/signin`, `/signin/totp`, `/signout`,\n  `/account/2fa`; argon2 hashing; session and pending cookies (only SHA-256 hashes of tokens\n  are stored).\n- `cal_mirror/web/page_oauth.py`: the calendar grant. `load_client(store)` returns the owner's\n  OAuth web client (stored secret `google_client`, or the file `CAL_MIRROR_GOOGLE_CLIENT`);\n  `/google/connect` and `/google/callback` ask for the calendar scope and store the token as\n  secret `google_token`. `CAL_MIRROR_OAUTH_REDIRECT` overrides that redirect URI.\n- `cal_mirror/web/page_settings.py` and `cal_mirror/model.py` `Settings`: owner settings,\n  stored as JSON by the store. `Settings.two_factor` exists but nothing reads it.\n- `cal_mirror/model.py` `AuthRecord`; `cal_mirror/ports.py` `Store` protocol, implemented\n  twice: `cal_mirror/store_memory.py` (tests) and `cal_mirror/store_pg.py` (PostgreSQL, schema\n  in `cal_mirror/migrations/*.sql`, applied in name order by `migrate`). A new store method\n  goes in the protocol and both implementations, and `tests/test_store_parity.py` style tests\n  show they agree.\n- Templates in `cal_mirror/web/templates/`, one stylesheet in `cal_mirror/web/static/`.\n- Deployment: `deploy/compose/init.sh` writes `.env` with fresh secrets for the compose\n  quickstart; `deploy/k8s/web-deployment.yaml` reads secrets from the Secret\n  `cal-mirror-secrets` and settings from the ConfigMap `cal-mirror-settings`.\n- Docs: one `docs/<module>.md` per module (`docs/page_signin.md` documents today's sign-in\n  rules exactly), `docs/install.md`, `docs/quickstart.md`, `README.md`.\n\n## Conventions\n\n- Python 3.13, ruff (rules E, F, W, I, B, UP, S, BLE; line length 100), `ruff format`.\n- Tests: pytest in `tests/`, one `tests/test_<module>.py` per module, FastAPI `TestClient`,\n  `MemoryStore` or a small fake store, `FixedClock` for time; never the network, never a real\n  Google account. `cal_mirror/fake_google.py` is the fake Calendar API. Tests that need\n  PostgreSQL take the `pg_dsn` fixture from `tests/conftest.py` (protected).\n- Every time comes from the app clock. Secrets (tokens, TOTP secrets, passwords, codes) are\n  never written in plain text to the database, logs or alerts; the store encrypts secrets with\n  the box from `CAL_MIRROR_SECRET_KEY`.\n- A secret the deployment supplies is an environment variable, filled at install.\n- Existing tests that post forms send no `Origin` header today; where a requirement here makes\n  that a refusal, those tests change with it.\n- Dependencies are locked (`pyproject.toml`, `uv.lock` are protected). Passkey verification\n  uses the `webauthn` package, which the owner adds to the lock before this PRD is submitted;\n  no other new dependency.\n\n## Interfaces to keep\n\n- `create_app(store, clock=None)` and the `Store` protocol's existing methods keep their\n  signatures; new behaviour is new methods or new optional parameters.\n- The calendar grant flow (`/google`, `/google/client`, `/google/connect`, `/google/callback`)\n  keeps its paths, its scope and its stored secret names.\n- The session cookie `cal_mirror_session` and the pending cookie `cal_mirror_pending` keep\n  their names and lifetimes.\n\n## Out of scope\n\n- Public exposure: ingress, Let's Encrypt, NetworkPolicy, `X-Forwarded-For` or any forwarded\n  client address (the client address is the connection's peer address, `request.client.host`).\n- Push notifications from Google, the worker, sync, rules, archive and cleanup.\n- Front-end restyling beyond the controls these requirements add.\n",
+    "scope": [
+      "cal_mirror/web/*",
+      "cal_mirror/model.py",
+      "cal_mirror/ports.py",
+      "cal_mirror/store_memory.py",
+      "cal_mirror/store_pg.py",
+      "cal_mirror/migrations/*",
+      "tests/*",
+      "deploy/*",
+      "docs/*",
+      "README.md"
+    ],
+    "priority": 1
+  }
+]
