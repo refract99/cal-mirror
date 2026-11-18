@@ -2,7 +2,7 @@ import os
 import secrets
 from dataclasses import replace
 from datetime import datetime, timedelta
-from typing import Annotated, Literal
+from typing import Annotated
 
 import pyotp
 from argon2 import PasswordHasher
@@ -20,20 +20,24 @@ from cal_mirror.web.deps import (
     session_hash,
     templates,
 )
+from cal_mirror.web.signin_guard import (
+    FAILURE_MESSAGE,
+    LOCK_MESSAGE,
+    PENDING_COOKIE,
+    PENDING_SECONDS,
+    SESSION_SECONDS,  # noqa: F401 (re-exported)
+    _cookie_options,
+    complete_signin,
+    is_locked,
+    pending_hash,
+    record_failure,
+)
 
 router = APIRouter()
-
-MAX_FAILURES = 5
-LOCK_SECONDS = 900
-SESSION_SECONDS = 43200
-PENDING_SECONDS = 300
-PENDING_COOKIE = "cal_mirror_pending"
 
 MIN_PASSWORD_LENGTH = 12
 RECOVERY_CODE_COUNT = 10
 TOTP_STORE_NAME = "totp_secret"
-LOCK_MESSAGE = "Sign-in is locked. Try again later."
-FAILURE_MESSAGE = "Wrong password or code."
 SETUP_CODE_ENV = "CAL_MIRROR_SETUP_CODE"
 
 _hasher = PasswordHasher()
@@ -62,32 +66,14 @@ def _page(request: Request, name: str, status_code: int = 200, **context: object
     return templates.TemplateResponse(request, name, context, status_code=status_code)
 
 
-def _locked(auth: AuthRecord, now: datetime) -> bool:
-    return auth.locked_until is not None and auth.locked_until > now
-
-
 def _locked_page(request: Request, name: str) -> Response:
     return _page(request, name, 429, error=LOCK_MESSAGE)
 
 
-def _fail(request: Request, store: Store, auth: AuthRecord, now: datetime, name: str) -> Response:
-    failures = auth.failures + 1
-    if failures >= MAX_FAILURES:
-        locked_until = now + timedelta(seconds=LOCK_SECONDS)
-        store.save_auth(replace(auth, failures=0, locked_until=locked_until))
+def _fail(request: Request, name: str) -> Response:
+    if record_failure(request):
         return _locked_page(request, name)
-    store.save_auth(replace(auth, failures=failures))
     return _page(request, name, 401, error=FAILURE_MESSAGE)
-
-
-def _cookie_options(samesite: Literal["lax", "strict"]) -> dict[str, object]:
-    return {"httponly": True, "secure": True, "samesite": samesite}
-
-
-def _new_session(store: Store, now: datetime, response: Response) -> None:
-    token = secrets.token_urlsafe(32)
-    store.create_session(session_hash(token), now + timedelta(seconds=SESSION_SECONDS))
-    response.set_cookie(SESSION_COOKIE, token, max_age=SESSION_SECONDS, **_cookie_options("lax"))
 
 
 def _totp_valid(store: Store, code: str, now: datetime) -> bool:
@@ -156,15 +142,14 @@ def signin_submit(
     auth = store.get_auth()
     if not auth.password_hash:
         return _redirect("/setup")
-    now = clock.now()
-    if _locked(auth, now):
+    if is_locked(request):
         return _locked_page(request, "signin.html")
     if not verify_password(auth.password_hash, password):
-        return _fail(request, store, auth, now, "signin.html")
+        return _fail(request, "signin.html")
+    now = clock.now()
     if not auth.totp_enabled:
-        store.save_auth(replace(auth, failures=0, locked_until=None))
         response = _redirect("/status")
-        _new_session(store, now, response)
+        complete_signin(request, response)
         return response
     pending = secrets.token_urlsafe(32)
     store.create_session(
@@ -199,22 +184,18 @@ def totp_submit(
 ) -> Response:
     auth = store.get_auth()
     now = clock.now()
-    if _locked(auth, now):
+    if is_locked(request):
         return _locked_page(request, "signin_totp.html")
-    pending = request.cookies.get(PENDING_COOKIE)
-    if not pending or not store.session_valid(session_hash("pending:" + pending), now):
+    if pending_hash(request) is None:
         return _redirect("/signin")
     if not _totp_valid(store, code, now):
         used = _recovery_match(auth, code)
         if used is None:
-            return _fail(request, store, auth, now, "signin_totp.html")
+            return _fail(request, "signin_totp.html")
         remaining = tuple(h for h in auth.recovery_hashes if h != used)
-        auth = replace(auth, recovery_hashes=remaining)
-    store.save_auth(replace(auth, failures=0, locked_until=None))
-    store.delete_session(session_hash("pending:" + pending))
+        store.save_auth(replace(auth, recovery_hashes=remaining))
     response = _redirect("/status")
-    response.delete_cookie(PENDING_COOKIE)
-    _new_session(store, now, response)
+    complete_signin(request, response)
     return response
 
 

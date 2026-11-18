@@ -6,12 +6,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from cal_mirror.model import AuthRecord
+from cal_mirror.model import AuthRecord, Settings
 from cal_mirror.ports import FixedClock
 from cal_mirror.web.deps import SESSION_COOKIE, current_user, session_hash
 from cal_mirror.web.page_signin import (
-    LOCK_SECONDS,
-    MAX_FAILURES,
     PENDING_COOKIE,
     SESSION_SECONDS,
     hash_password,
@@ -22,6 +20,8 @@ from cal_mirror.web.page_signin import (
 PASSWORD = "fixture-password-1"
 SETUP_CODE = "fixture-setup-code-1"
 START = datetime(2026, 11, 3, 12, 0, tzinfo=UTC)
+MAX_FAILURES = Settings().signin_failure_limit
+LOCK_SECONDS = Settings().signin_lock_seconds
 
 
 @pytest.fixture(autouse=True)
@@ -46,6 +46,9 @@ class FakeStore:
     def save_auth(self, a):
         self.saves += 1
         self.auth = a
+
+    def get_settings(self):
+        return Settings()
 
     def get_secret(self, name):
         return self.secrets.get(name)
@@ -201,12 +204,16 @@ def test_wrong_password_counts_failure():
     assert r.status_code == 401
     assert "Wrong password or code." in r.text
     assert SESSION_COOKIE not in r.cookies
-    assert env.store.auth.failures == 1
     assert env.store.sessions == {}
+    statuses = [env.signin("wrong-password-1").status_code for _ in range(MAX_FAILURES - 2)]
+    assert statuses == [401] * (MAX_FAILURES - 2)
+    assert env.signin("wrong-password-1").status_code == 429
 
 
 def test_right_password_without_2fa_opens_session():
-    env = make_env(with_password(failures=2))
+    env = make_env(with_password())
+    env.signin("wrong-password-1")
+    env.signin("wrong-password-1")
     r = env.signin()
     assert r.status_code == 303
     assert r.headers["location"] == "/status"
@@ -217,7 +224,9 @@ def test_right_password_without_2fa_opens_session():
     assert "HttpOnly" in header
     assert "Secure" in header
     assert "SameSite=lax" in header
-    assert env.store.auth.failures == 0
+    # a successful sign-in cleared the failures: a full run of misses is needed to lock again
+    statuses = [env.signin("wrong-password-1").status_code for _ in range(MAX_FAILURES)]
+    assert statuses == [401] * (MAX_FAILURES - 1) + [429]
 
 
 def test_2fa_right_password_waits_for_code():
@@ -249,7 +258,9 @@ def test_2fa_wrong_code_rejected():
     assert r.status_code == 401
     assert SESSION_COOKIE not in r.cookies
     assert len(env.store.sessions) == 1
-    assert env.store.auth.failures == 1
+    statuses = [env.code(wrong).status_code for _ in range(MAX_FAILURES - 2)]
+    assert statuses == [401] * (MAX_FAILURES - 2)
+    assert env.code(wrong).status_code == 429
 
 
 def test_2fa_stale_pending_redirects_to_signin():
@@ -323,12 +334,10 @@ def test_password_and_totp_failures_share_counter():
     env = make_2fa_env()
     env.signin("wrong-password-1")
     env.signin("wrong-password-1")
-    assert env.store.auth.failures == 2
-    env.signin()
-    assert env.store.auth.failures == 2
+    env.signin()  # the password step alone clears nothing
     wrong = "000000" if env.totp_now() != "000000" else "111111"
-    assert env.code(wrong).status_code == 401
-    assert env.store.auth.failures == 3
+    statuses = [env.code(wrong).status_code for _ in range(MAX_FAILURES - 2)]
+    assert statuses == [401] * (MAX_FAILURES - 3) + [429]
 
 
 def enable(env):
@@ -437,5 +446,6 @@ def test_hash_and_verify_round_trip():
 
 
 def test_constants():
-    assert (MAX_FAILURES, LOCK_SECONDS, SESSION_SECONDS) == (5, 900, 43200)
+    assert (MAX_FAILURES, LOCK_SECONDS) == (5, 900)
+    assert SESSION_SECONDS == 43200
     assert PENDING_COOKIE == "cal_mirror_pending"

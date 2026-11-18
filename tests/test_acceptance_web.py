@@ -19,7 +19,6 @@ from cal_mirror.sync import run_once
 from cal_mirror.web import page_oauth
 from cal_mirror.web.app import create_app
 from cal_mirror.web.deps import SESSION_COOKIE
-from cal_mirror.web.page_signin import LOCK_SECONDS, MAX_FAILURES
 
 PASSWORD = "fixture-password-1"
 SETUP_CODE = "fixture-setup-code-1"
@@ -209,12 +208,12 @@ def test_criterion_8_lockout() -> None:
         data={"password": PASSWORD, "confirm": PASSWORD, "setup_code": SETUP_CODE},
     )
     last = client.post("/signin", data={"password": "fixture-wrong-password"})
-    for _ in range(MAX_FAILURES - 1):
+    for _ in range(Settings().signin_failure_limit - 1):
         last = client.post("/signin", data={"password": "fixture-wrong-password"})
     assert last.status_code == 429
     blocked = client.post("/signin", data={"password": PASSWORD})
     assert blocked.status_code == 429
-    clk.advance(LOCK_SECONDS + 1)
+    clk.advance(Settings().signin_lock_seconds + 1)
     opened = client.post("/signin", data={"password": PASSWORD})
     assert opened.status_code == 303
     assert opened.headers["location"] == "/status"
