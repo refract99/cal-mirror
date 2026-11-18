@@ -25,10 +25,13 @@ Every text value is stripped before it is checked.
 | `time_zone` | a zone name known to `zoneinfo` |
 | `web_url` | http or https URL |
 | `check_no_link`, `check_hours` | checkboxes; present is on, absent is off |
+| `signin_failure_limit` | whole number, 1 or more: wrong sign-in attempts from one address before it is locked |
+| `signin_lock_seconds` | whole number, 1 or more: how long that address stays locked, and how long a quiet address is remembered |
 | `allowed_hours_0` .. `allowed_hours_6` | Monday .. Sunday, `HH:MM-HH:MM`; blank means no allowed hours that day |
 
-The page changes only these ten settings. `main_calendar`, `secondary_calendars`,
-`default_calendar` and `two_factor` stay as they were.
+The page changes only these twelve settings. `main_calendar`, `secondary_calendars` and
+`default_calendar` stay as they were. Both sign-in fields are required: a missing field,
+a value below 1 or one that is not an integer is refused like any other bad value.
 
 ## Messages
 
@@ -43,5 +46,8 @@ Only the first failing rule is shown, in this order:
 7. Web URL must be an http or https URL.
 8. Allowed hours for `<Day>` must be HH:MM-HH:MM with start before end. (`<Day>` is
    Monday .. Sunday; the first failing weekday from Monday is named.)
+
+9. Sign-in failure limit must be a whole number of 1 or more.
+10. Sign-in lock seconds must be a whole number of 1 or more.
 
 A URL `urlsplit` cannot parse (such as `https://[`) gets the field's URL message.

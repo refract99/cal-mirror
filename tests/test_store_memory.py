@@ -374,7 +374,7 @@ def test_status_round_trip():
 
 def test_auth_round_trip():
     s = MemoryStore()
-    new = AuthRecord(password_hash="h", totp_enabled=True, failures=1, locked_until=T)
+    new = AuthRecord(password_hash="h", totp_enabled=True, recovery_hashes=("r",))
     s.save_auth(new)
     assert s.get_auth() == new
 

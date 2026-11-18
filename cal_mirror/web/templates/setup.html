@@ -5,9 +5,12 @@
 {% block content %}
 <h1>Set a password</h1>
 {% if error %}<p>{{ error }}</p>{% endif %}
+{% if not no_form %}
 <form method="post">
+  <label>Setup code <input type="password" name="setup_code" autocomplete="off" required></label>
   <label>Password <input type="password" name="password" autocomplete="new-password" required></label>
   <label>Confirm <input type="password" name="confirm" autocomplete="new-password" required></label>
   <button type="submit">Set password</button>
 </form>
+{% endif %}
 {% endblock %}
