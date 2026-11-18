@@ -100,7 +100,8 @@
       "tests/*",
       "deploy/*",
       "docs/*",
-      "README.md"
+      "README.md",
+      "compose.yaml"
     ],
     "priority": 1
   }
