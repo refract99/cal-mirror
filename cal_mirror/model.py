@@ -144,7 +144,8 @@ class Settings:
     check_hours: bool = True
     allowed_hours: Mapping[int, tuple[time, time]] = field(default_factory=dict, compare=False)
     web_url: str = ""
-    two_factor: bool = False
+    signin_failure_limit: int = 5
+    signin_lock_seconds: int = 900
 
 
 @dataclass(frozen=True)
@@ -196,12 +197,25 @@ class Status:
 
 
 @dataclass(frozen=True)
+class Passkey:
+    credential_id: str
+    name: str
+    public_key: bytes
+    sign_count: int
+    created: datetime
+
+
+@dataclass(frozen=True)
+class GoogleLink:
+    sub: str
+    email: str
+
+
+@dataclass(frozen=True)
 class AuthRecord:
     password_hash: str = ""
     totp_enabled: bool = False
     recovery_hashes: tuple[str, ...] = ()
-    failures: int = 0
-    locked_until: datetime | None = None
 
 
 @dataclass(frozen=True)

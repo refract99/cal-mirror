@@ -24,6 +24,10 @@
     <input type="text" name="time_zone" value="{{ values.time_zone }}"></label></p>
   <p><label>Web URL
     <input type="text" name="web_url" value="{{ values.web_url }}"></label></p>
+  <p><label>Sign-in failures before an address is locked
+    <input type="number" min="1" name="signin_failure_limit" value="{{ values.signin_failure_limit }}"></label></p>
+  <p><label>Sign-in lock (seconds)
+    <input type="number" min="1" name="signin_lock_seconds" value="{{ values.signin_lock_seconds }}"></label></p>
   <p><label><input type="checkbox" name="check_no_link"{% if checks.check_no_link %} checked{% endif %}>
     Check for a missing call link</label></p>
   <p><label><input type="checkbox" name="check_hours"{% if checks.check_hours %} checked{% endif %}>
