@@ -61,6 +61,16 @@ spec:
                 configMapKeyRef:
                   name: cal-mirror-settings
                   key: OAUTH_REDIRECT
+            - name: CAL_MIRROR_SIGNIN_REDIRECT
+              valueFrom:
+                configMapKeyRef:
+                  name: cal-mirror-settings
+                  key: SIGNIN_REDIRECT
+            - name: CAL_MIRROR_SETUP_CODE
+              valueFrom:
+                secretKeyRef:
+                  name: cal-mirror-secrets
+                  key: setup-code
             - name: CAL_MIRROR_PORT
               value: "8443"
             - name: CAL_MIRROR_TLS_CERT
