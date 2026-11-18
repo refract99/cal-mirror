@@ -191,7 +191,7 @@ def test_valid_post_redirects_and_keeps_first_place_of_repeats():
 
 
 def test_round_trip_shows_saved_values_and_keeps_other_fields():
-    before = Settings(owner_email="s@x.org", sync_interval_minutes=9, two_factor=True)
+    before = Settings(owner_email="s@x.org", sync_interval_minutes=9, signin_failure_limit=3)
     store = FakeStore(CALENDARS, before)
     client = make_client(store)
     client.post("/calendars", data={"main": "a", "secondary": ["b", "d"], "default": "d"})

@@ -14,7 +14,6 @@ START = Settings(
     secondary_calendars=("s1", "s2"),
     default_calendar="s1",
     owner_email="steve@example.com",
-    two_factor=True,
 )
 
 VALID = {
@@ -33,6 +32,8 @@ VALID = {
     "allowed_hours_4": "",
     "allowed_hours_5": "",
     "allowed_hours_6": "",
+    "signin_failure_limit": "5",
+    "signin_lock_seconds": "900",
 }
 
 
@@ -160,8 +161,7 @@ def test_round_trip_keeps_fields_the_page_does_not_own():
         saved.main_calendar,
         saved.secondary_calendars,
         saved.default_calendar,
-        saved.two_factor,
-    ) == ("main", ("s1", "s2"), "s1", True)
+    ) == ("main", ("s1", "s2"), "s1")
 
 
 def test_sync_interval_zero_rejected():
@@ -383,3 +383,11 @@ def test_header_shows_the_version():
 
     client, _ = make_client()
     assert f"v{__version__}" in client.get("/settings").text
+
+
+def test_signin_lock_values_must_be_whole_numbers_of_one_or_more():
+    for name in ("signin_failure_limit", "signin_lock_seconds"):
+        for bad in ("0", "-1", "abc", "2.5", ""):
+            response, store = post(**{name: bad})
+            assert response.status_code == 400
+            assert store.saved == []

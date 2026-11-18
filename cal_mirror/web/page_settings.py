@@ -20,6 +20,13 @@ TOPIC_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 HOURS_RE = re.compile(r"(([01]\d|2[0-3]):[0-5]\d)-(([01]\d|2[0-3]):[0-5]\d)")
 
 
+def _whole_number(text: str) -> int:
+    try:
+        return int(text)
+    except ValueError:
+        return 0
+
+
 def _is_http_url(text: str) -> bool:
     try:
         parts = urlsplit(text)
@@ -50,6 +57,8 @@ def _values_from_settings(s: Settings) -> dict[str, str]:
         "owner_email": s.owner_email,
         "time_zone": s.time_zone,
         "web_url": s.web_url,
+        "signin_failure_limit": str(s.signin_failure_limit),
+        "signin_lock_seconds": str(s.signin_lock_seconds),
     }
     for day in range(7):
         window = s.allowed_hours.get(day)
@@ -99,6 +108,7 @@ async def save_settings(
     form = await request.form()
     names = ["sync_interval_minutes", "ntfy_server", "ntfy_topic", "archive_destinations"]
     names += ["owner_email", "time_zone", "web_url"]
+    names += ["signin_failure_limit", "signin_lock_seconds"]
     names += [f"allowed_hours_{day}" for day in range(7)]
     values = {name: str(form.get(name, "")).strip() for name in names}
     checks = {name: name in form for name in ("check_no_link", "check_hours")}
@@ -106,10 +116,7 @@ async def save_settings(
     def fail(message: str):
         return _render(request, values, checks, message, 400)
 
-    try:
-        interval = int(values["sync_interval_minutes"])
-    except ValueError:
-        interval = 0
+    interval = _whole_number(values["sync_interval_minutes"])
     if not 1 <= interval <= 1440:
         return fail("Sync interval must be a whole number of minutes from 1 to 1440.")
     if not _is_http_url(values["ntfy_server"]):
@@ -137,6 +144,12 @@ async def save_settings(
         if window is None:
             return fail(f"Allowed hours for {name} must be HH:MM-HH:MM with start before end.")
         allowed_hours[day] = window
+    failure_limit = _whole_number(values["signin_failure_limit"])
+    if failure_limit < 1:
+        return fail("Sign-in failure limit must be a whole number of 1 or more.")
+    lock_seconds = _whole_number(values["signin_lock_seconds"])
+    if lock_seconds < 1:
+        return fail("Sign-in lock seconds must be a whole number of 1 or more.")
 
     store.save_settings(
         dataclasses.replace(
@@ -151,6 +164,8 @@ async def save_settings(
             check_no_link=checks["check_no_link"],
             check_hours=checks["check_hours"],
             allowed_hours=allowed_hours,
+            signin_failure_limit=failure_limit,
+            signin_lock_seconds=lock_seconds,
         )
     )
     return RedirectResponse("/settings", status_code=303)
