@@ -13,7 +13,7 @@ docker compose up -d --build
 
 Then open <https://localhost:8443>. The certificate is self-signed and made on first start, so your browser warns once; continue past it.
 
-1. **Set a password** (first visit), then turn on 2FA (TOTP) under the account page. Save the recovery codes.
+1. **Set a password** (first visit). The page first asks for the setup code that `init.sh` wrote to `.env`; read it with `grep CAL_MIRROR_SETUP_CODE .env`. A second factor, TOTP or a passkey, is then required. Save the recovery codes.
 2. **Connect Google.** On the Google page, paste your OAuth client ID and secret once (they are stored encrypted), then press Connect Google. Sign in with the account whose calendars you want to mirror and allow access. You continue past the "unverified app" warning.
 3. **Pick calendars:** the main calendar, the secondary calendars to mirror, and the default calendar for copies.
 4. **Add rules** (optional) and set your **ntfy** server and topic in settings to receive alerts.
@@ -26,6 +26,7 @@ Edit `.env`, then `docker compose up -d`.
 | Variable | Meaning |
 | --- | --- |
 | `CAL_MIRROR_SECRET_KEY` | Encrypts stored secrets. **Back it up.** If you lose it, reconnect Google and set up 2FA again. |
+| `CAL_MIRROR_SETUP_CODE` | One-time code written by `deploy/compose/init.sh`. You type it on the first-run page `/setup` before you can set a password. |
 | `PG_PASSWORD` | Postgres password. Only applied when the database is first created. |
 | `HOST_NAME` | Name you type in the browser. Must match the redirect URI in your OAuth client. Default `localhost`. |
 | `WEB_PORT` | Port on the host. Default `8443`. |

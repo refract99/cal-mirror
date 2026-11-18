@@ -9,7 +9,7 @@ Self-hosted mirror for one Google account with several calendars.
 
 It never sends email or invitations (every write uses `sendUpdates=none`), never adds guests, calls no AI service, and keeps your events on your own machine. Alerts go to an [ntfy](https://ntfy.sh) topic.
 
-A worker does all calendar work. A small config-only web app (password and TOTP sign-in) sets calendars, rules and settings. Both use Postgres.
+A worker does all calendar work. A small config-only web app (password plus a required second factor, TOTP or passkey, or Sign in with Google) sets calendars, rules and settings. Both use Postgres.
 
 ## Quickstart
 
