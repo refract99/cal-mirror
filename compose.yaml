@@ -50,6 +50,8 @@ services:
     environment:
       <<: *app-env
       CAL_MIRROR_OAUTH_REDIRECT: https://${HOST_NAME:-localhost}:${WEB_PORT:-8443}/google/callback
+      CAL_MIRROR_SIGNIN_REDIRECT: https://${HOST_NAME:-localhost}:${WEB_PORT:-8443}/signin/google/callback
+      CAL_MIRROR_SETUP_CODE: ${CAL_MIRROR_SETUP_CODE:?run deploy/compose/init.sh}
       CAL_MIRROR_PORT: "8443"
       CAL_MIRROR_BIND: 0.0.0.0
       CAL_MIRROR_TLS_CERT: /certs/tls.crt
