@@ -1,4 +1,3 @@
-import os
 from datetime import UTC, datetime, timedelta
 
 import psycopg
@@ -7,7 +6,6 @@ from cal_mirror.model import REQ_ARCHIVE, REQ_READY, REQ_RULES, Request
 from cal_mirror.store_memory import MemoryStore
 from cal_mirror.store_pg import PgStore
 
-DSN = os.environ["CAL_MIRROR_TEST_DSN"]
 T = datetime(2026, 11, 2, 18, tzinfo=UTC)
 
 
@@ -19,11 +17,11 @@ class PrefixBox:
         return token[len("box:") :]
 
 
-def make_pg() -> PgStore:
-    with psycopg.connect(DSN, autocommit=True) as conn:
+def make_pg(dsn: str) -> PgStore:
+    with psycopg.connect(dsn, autocommit=True) as conn:
         conn.execute("DROP SCHEMA public CASCADE")
         conn.execute("CREATE SCHEMA public")
-    return PgStore(DSN, PrefixBox())
+    return PgStore(dsn, PrefixBox())
 
 
 def request_sequence(store) -> tuple:
@@ -58,11 +56,11 @@ def session_sequence(store) -> tuple:
     return (first, second, third)
 
 
-def test_update_request_parity() -> None:
+def test_update_request_parity(pg_dsn: str) -> None:
     expected = ("rules", "ready", {"rules": []}, {"moves": 1}, True)
-    assert request_sequence(MemoryStore()) == request_sequence(make_pg()) == expected
+    assert request_sequence(MemoryStore()) == request_sequence(make_pg(pg_dsn)) == expected
 
 
-def test_create_session_parity() -> None:
+def test_create_session_parity(pg_dsn: str) -> None:
     expected = (True, False, False)
-    assert session_sequence(MemoryStore()) == session_sequence(make_pg()) == expected
+    assert session_sequence(MemoryStore()) == session_sequence(make_pg(pg_dsn)) == expected

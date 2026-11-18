@@ -31,7 +31,7 @@ Two images and kustomize manifests (cert-manager TLS, network policies, an archi
 ## More
 
 - What it does, in detail: [docs/prd.md](docs/prd.md). How it is built: [docs/architecture.md](docs/architecture.md). Known gaps and plans: [docs/roadmap.md](docs/roadmap.md).
-- Development: `scripts/gate.sh` runs ruff and the tests (it starts a throwaway Postgres; see the script). The tests use a fake Google Calendar API, never the live one.
+- Development: you need `uv`, and PostgreSQL's `initdb` and `pg_ctl` on your `PATH` (version 17 or later). `scripts/gate.sh` runs the three checks: `ruff check .`, `ruff format --check .` and `pytest -q`. The tests start their own throwaway PostgreSQL and use a fake Google Calendar API, never the live one or the network.
 
 ## License
 

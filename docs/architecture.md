@@ -51,7 +51,7 @@ web/page_*.py ──Store──► store_pg (Postgres) ◄──Store── work
 
 ## Components
 
-Each writes its module, its tests in a **new** file `tests/test_<module>.py`, and `docs/<module>.md`. Each row's intent page is the full spec; where it is more exact than this table, the intent wins. Check `C` = `/usr/bin/uv run --offline --frozen pytest -q -p no:cacheprovider`.
+Each writes its module, its tests in a **new** file `tests/test_<module>.py`, and `docs/<module>.md`. Each row's intent page is the full spec; where it is more exact than this table, the intent wins. Check `C` = `pytest -q`.
 
 | Row | Component | Files | Needs | Leaves | Check |
 |---|---|---|---|---|---|
@@ -92,14 +92,15 @@ Request flow: D4 writes a `REQ_RULES` request with the proposed rules and never 
 
 ## Gates
 
-- **Repo gate:** `/bin/sh scripts/gate.sh`: `uv sync` offline and frozen, `ruff check .`, `ruff format --check .`, then `pytest -q` (only when `tests/test_*.py` exist) with a throwaway Postgres cluster from `~/.local/opt/pg18` and `CAL_MIRROR_TEST_DSN` exported. Only C1's tests read that variable.
+- **Checks:** three plain commands, each run from the repository root in the locked environment (`uv sync --frozen` builds it in `.venv`): `ruff check .`, `ruff format --check .` and `pytest -q`. Both ruff commands also take a list of files in place of `.`. `scripts/gate.sh` is a developer shortcut that runs the three through `uv run --frozen`.
+- **PostgreSQL for the tests:** the fixture `pg_dsn` in `tests/conftest.py` finds `initdb` and `pg_ctl` on `PATH`, makes a cluster in pytest's temporary directory and reaches it through a socket there. `CAL_MIRROR_TEST_DSN` names a running server in its place (the CI service container). With neither, the tests that need a database fail and say so; none is skipped. Only `tests/test_store_pg.py`, `tests/test_store_parity.py` and one test of `tests/test_acceptance_web.py` use it.
+- **No network:** no test needs the network, a Google credential or a secret.
 - **Ruff rules:** `E, F, W, I, B, UP, S, BLE`, line length 100. Bites: S101 `assert` outside `tests/`; S608 SQL built with an f-string or `+` (one fixed query string per statement); S105/S106 hard-coded password outside tests; S108 a `/tmp` literal; BLE001 blind `except Exception`; I001 import order; UP modern typing (`X | None`, `list[...]`). Format with `ruff format`.
-- **Gate scripts:** `scripts/gate.sh`, protected.
-- **Proven:** 2026-10-24 on s1, exit 0, by dev: 0.05 s with no tests; 0.70 s with one Postgres test (Postgres share 0.46 s, 8 runs).
+- **Proven:** 2026-11-16 on the owner's laptop: 851 tests passed on Python 3.13.18 with PostgreSQL 17.11 on `PATH`, in a sandbox with no network device (14 s).
 
 ## Protected paths
 
-`pyproject.toml`, `uv.lock`, `.python-version`, `scripts/gate.sh`. No intent edits `conftest.py`, `cal_mirror/__init__.py` or a doc another row owns. Every library is already locked; no part adds one.
+No intent changes these: `pyproject.toml`, `uv.lock`, `.python-version` (they decide the environment; a dependency changes by the owner's own commit), `.github/workflows/*`, `tests/conftest.py`, `scripts/gate.sh`, `LICENSE`. No intent edits `cal_mirror/__init__.py` (the release stamps the version there).
 
 ## Deviations from the PRD
 

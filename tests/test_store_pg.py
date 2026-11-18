@@ -1,4 +1,3 @@
-import os
 from datetime import UTC, date, datetime, time, timedelta
 
 import psycopg
@@ -27,8 +26,6 @@ from cal_mirror.model import (
 from cal_mirror.ports import StoreError
 from cal_mirror.store_pg import PgStore, migrate
 
-DSN = os.environ["CAL_MIRROR_TEST_DSN"]
-
 
 class FakeBox:
     def encrypt(self, plain: str) -> str:
@@ -39,8 +36,8 @@ class FakeBox:
 
 
 @pytest.fixture(autouse=True)
-def clean_schema() -> None:
-    with psycopg.connect(DSN, autocommit=True) as conn:
+def clean_schema(pg_dsn: str) -> None:
+    with psycopg.connect(pg_dsn, autocommit=True) as conn:
         conn.execute("DROP SCHEMA public CASCADE")
         conn.execute("CREATE SCHEMA public")
 
@@ -51,11 +48,11 @@ def box() -> FakeBox:
 
 
 @pytest.fixture
-def store(box: FakeBox, clean_schema: None) -> PgStore:
-    return PgStore(DSN, box)
+def store(box: FakeBox, pg_dsn: str, clean_schema: None) -> PgStore:
+    return PgStore(pg_dsn, box)
 
 
-def test_settings_round_trip(store: PgStore) -> None:
+def test_settings_round_trip(store: PgStore, pg_dsn: str) -> None:
     saved = Settings(
         allowed_hours={0: (time(9), time(17))},
         secondary_calendars=("a", "b"),
@@ -65,7 +62,7 @@ def test_settings_round_trip(store: PgStore) -> None:
     assert got == saved
     assert got.allowed_hours == {0: (time(9), time(17))}
     assert type(got.allowed_hours) is dict
-    with psycopg.connect(DSN) as conn:
+    with psycopg.connect(pg_dsn) as conn:
         data = conn.execute("SELECT data FROM state WHERE name = %s", ("settings",)).fetchone()[0]
     assert data["allowed_hours"] == {"0": ["09:00:00", "17:00:00"]}
     assert data["secondary_calendars"] == ["a", "b"]
@@ -92,8 +89,8 @@ def test_settings_round_trip(store: PgStore) -> None:
     assert got.allowed_hours == {0: (time(9), time(17)), 2: (time(10, 30), time(16))}
 
 
-def test_missing_json_key_uses_field_default(store: PgStore) -> None:
-    with psycopg.connect(DSN) as conn:
+def test_missing_json_key_uses_field_default(store: PgStore, pg_dsn: str) -> None:
+    with psycopg.connect(pg_dsn) as conn:
         conn.execute(
             "INSERT INTO state (name, data) VALUES (%s, %s)",
             ("settings", Jsonb({"main_calendar": "main"})),
@@ -314,9 +311,9 @@ def test_update_request_unknown_id(store: PgStore) -> None:
     assert str(caught.value) == "unknown request 999"
 
 
-def test_secrets_round_trip(store: PgStore, box: FakeBox) -> None:
+def test_secrets_round_trip(store: PgStore, box: FakeBox, pg_dsn: str) -> None:
     store.set_secret("google_token", "fixture-token-1")
-    with psycopg.connect(DSN) as conn:
+    with psycopg.connect(pg_dsn) as conn:
         row = conn.execute("SELECT name, token FROM secrets").fetchone()
     assert row is not None
     assert "fixture-token-1" not in row[0]
@@ -330,7 +327,7 @@ def test_secrets_round_trip(store: PgStore, box: FakeBox) -> None:
     assert store.get_secret("missing") is None
 
 
-def test_auth_round_trip(store: PgStore) -> None:
+def test_auth_round_trip(store: PgStore, pg_dsn: str) -> None:
     locked = datetime(2026, 11, 2, 17, tzinfo=UTC)
     saved = AuthRecord(
         password_hash="argon2hash",
@@ -341,7 +338,7 @@ def test_auth_round_trip(store: PgStore) -> None:
     )
     store.save_auth(saved)
     assert store.get_auth() == saved
-    with psycopg.connect(DSN) as conn:
+    with psycopg.connect(pg_dsn) as conn:
         data = conn.execute("SELECT data FROM state WHERE name = %s", ("auth",)).fetchone()[0]
     assert data["password_hash"] == "argon2hash"
     assert data["recovery_hashes"] == ["h1", "h2"]
@@ -389,14 +386,14 @@ def test_defaults_on_empty_database(store: PgStore) -> None:
     assert store.get_meta("first_start_done") is None
 
 
-def test_migrate_twice(store: PgStore) -> None:
-    with psycopg.connect(DSN) as conn:
+def test_migrate_twice(store: PgStore, pg_dsn: str) -> None:
+    with psycopg.connect(pg_dsn) as conn:
         migrate(conn)
         migrate(conn)
         rows = conn.execute("SELECT name FROM schema_version ORDER BY name").fetchall()
     assert rows == [("0001_init.sql",)]
 
 
-def test_missing_database(box: FakeBox) -> None:
+def test_missing_database(box: FakeBox, pg_dsn: str) -> None:
     with pytest.raises(StoreError):
-        PgStore(make_conninfo(DSN, dbname="cal_mirror_missing"), box)
+        PgStore(make_conninfo(pg_dsn, dbname="cal_mirror_missing"), box)

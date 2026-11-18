@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import re
 from datetime import UTC, datetime, time
 
@@ -201,9 +200,9 @@ def test_criterion_8_lockout() -> None:
     assert opened.headers["location"] == "/status"
 
 
-def test_criterion_9_no_plain_secret(caplog: pytest.LogCaptureFixture) -> None:
+def test_criterion_9_no_plain_secret(caplog: pytest.LogCaptureFixture, pg_dsn: str) -> None:
     caplog.set_level(logging.DEBUG)
-    dsn = os.environ["CAL_MIRROR_TEST_DSN"]
+    dsn = pg_dsn
     with psycopg.connect(dsn, autocommit=True) as conn:
         conn.execute("DROP SCHEMA public CASCADE")
         conn.execute("CREATE SCHEMA public")

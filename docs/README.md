@@ -39,7 +39,7 @@
 
 ## Run commands
 
-- `/bin/sh scripts/gate.sh`: the repo gate (ruff and format check, then the tests).
+- `sh scripts/gate.sh`: the three checks (`ruff check .`, `ruff format --check .`, `pytest -q`) in the locked environment. The tests need `initdb` and `pg_ctl` on `PATH`.
 - `python -m cal_mirror.worker`: start the worker.
 - `python -m cal_mirror.web.app`: start the web app.
 
