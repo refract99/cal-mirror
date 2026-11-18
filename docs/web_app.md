@@ -1,6 +1,6 @@
 # Web app
 
-`cal_mirror/web/app.py` builds one FastAPI app from the seven page routers and starts it
+`cal_mirror/web/app.py` builds one FastAPI app from the nine page routers and starts it
 with TLS only. It writes nothing itself: the pages write config and requests. It never reads
 or writes calendar events.
 
@@ -8,7 +8,9 @@ Entry point: `python -m cal_mirror.web.app` (`main()`).
 
 ## Public paths
 
-`PUBLIC_PATHS` is `/signin`, `/signin/totp` and `/setup`. No static files are mounted.
+`PUBLIC_PATHS` is `/signin`, `/signin/totp`, `/setup`, `/signin/passkey/options`,
+`/signin/passkey`, `/signin/google` and `/signin/google/callback`. The pages
+`page_passkey` and `page_google_signin` are included like the others. No static files are mounted.
 `GET /` redirects to `/status` (303) after the session check.
 
 ## Session middleware
@@ -19,13 +21,23 @@ fresh each request), it sets `request.state.user` to `steve`. A public path with
 session still sets the user. Any other path with no user is a 303 to `/signin` and the
 route does not run. Each page's `current_user` checks the same rule again.
 
+## Origin check
+
+An HTTP middleware declared after the session middleware, so it is outermost, runs before the
+session redirect and before any handler. Every `POST` whose `Origin` header is missing, `null`
+or not exactly `f"{request.url.scheme}://{request.url.netloc}"` (scheme, host and port as the
+request reached the app) is answered `403` with `Cross-origin request refused.`. No handler
+runs, so no cookie is set and nothing is stored. `GET` and `HEAD` need no `Origin`. The
+security headers below still apply to the refusal.
+
 ## Security headers
 
 Every response, including redirects and 404s, sets:
 
 - `X-Frame-Options: DENY`
 - `X-Content-Type-Options: nosniff`
-- `Referrer-Policy: no-referrer`
+- `Referrer-Policy: same-origin` (with `no-referrer` browsers send `Origin: null` on
+  same-origin form posts, which the Origin check refuses)
 - `Content-Security-Policy: default-src 'self'`
 - `Strict-Transport-Security: max-age=31536000`
 

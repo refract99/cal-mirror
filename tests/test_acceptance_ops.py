@@ -97,7 +97,12 @@ def _world(tmp_path=None):
 
 def _client(store, clock) -> TestClient:
     app = create_app(store, clock)
-    client = TestClient(app, base_url="https://testserver", follow_redirects=False)
+    client = TestClient(
+        app,
+        base_url="https://testserver",
+        follow_redirects=False,
+        headers={"Origin": "https://testserver"},
+    )
     store.create_session(session_hash(TOKEN), clock.now() + timedelta(days=30))
     client.cookies.set(SESSION_COOKIE, TOKEN)
     return client

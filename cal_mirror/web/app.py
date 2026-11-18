@@ -9,7 +9,7 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from cal_mirror.crypto import cipher_from_env
@@ -18,7 +18,9 @@ from cal_mirror.store_pg import PgStore
 from cal_mirror.web import (
     page_archive,
     page_calendars,
+    page_google_signin,
     page_oauth,
+    page_passkey,
     page_rules,
     page_settings,
     page_signin,
@@ -27,7 +29,17 @@ from cal_mirror.web import (
 from cal_mirror.web.deps import SESSION_COOKIE, session_hash, templates
 from cal_mirror.web.page_oauth import FlowConfigError
 
-PUBLIC_PATHS = frozenset({"/signin", "/signin/totp", "/setup"})
+PUBLIC_PATHS = frozenset(
+    {
+        "/signin",
+        "/signin/totp",
+        "/setup",
+        "/signin/passkey/options",
+        "/signin/passkey",
+        "/signin/google",
+        "/signin/google/callback",
+    }
+)
 STATIC_PREFIX = "/static/"
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -39,6 +51,8 @@ PAGES = (
     page_rules,
     page_archive,
     page_status,
+    page_passkey,
+    page_google_signin,
 )
 
 DEFAULT_BIND = str(ipaddress.IPv4Address(0))
@@ -50,10 +64,12 @@ TLS_REQUIRED = (
 
 CERT_CHECK_SECONDS = 60
 
+CROSS_ORIGIN_MESSAGE = "Cross-origin request refused."
+
 _SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
+    "Referrer-Policy": "same-origin",
     "Content-Security-Policy": "default-src 'self'",
     "Strict-Transport-Security": "max-age=31536000",
 }
@@ -88,6 +104,17 @@ def create_app(store: Store, clock: Clock | None = None) -> FastAPI:
             request.url.path not in PUBLIC_PATHS and not request.url.path.startswith(STATIC_PREFIX)
         ):
             response = RedirectResponse("/signin", status_code=303)
+        else:
+            response = await call_next(request)
+        return response
+
+    @app.middleware("http")
+    async def refuse_cross_origin(request: Request, call_next):
+        # Added last, so it is outermost: it runs before the session redirect and any handler.
+        if request.method == "POST" and request.headers.get("origin") != (
+            f"{request.url.scheme}://{request.url.netloc}"
+        ):
+            response = PlainTextResponse(CROSS_ORIGIN_MESSAGE, status_code=403)
         else:
             response = await call_next(request)
         for name, value in _SECURITY_HEADERS.items():

@@ -41,12 +41,23 @@ def _client(store=None, clock=None):
         create_app(store, clock),
         base_url="https://testserver",
         follow_redirects=False,
+        headers={"Origin": "https://testserver"},
     )
     return store, clock, client
 
 
 def test_public_paths():
-    assert PUBLIC_PATHS == frozenset({"/signin", "/signin/totp", "/setup"})
+    assert PUBLIC_PATHS == frozenset(
+        {
+            "/signin",
+            "/signin/totp",
+            "/setup",
+            "/signin/passkey/options",
+            "/signin/passkey",
+            "/signin/google",
+            "/signin/google/callback",
+        }
+    )
 
 
 def test_no_cookie_status_redirects_to_signin():
@@ -138,7 +149,7 @@ def test_security_headers_on_signin():
     assert response.status_code == 200
     assert response.headers["X-Frame-Options"] == "DENY"
     assert response.headers["X-Content-Type-Options"] == "nosniff"
-    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert response.headers["Referrer-Policy"] == "same-origin"
     assert response.headers["Content-Security-Policy"] == "default-src 'self'"
     assert response.headers["Strict-Transport-Security"] == "max-age=31536000"
 
@@ -149,7 +160,7 @@ def test_security_headers_on_unauthenticated_redirect():
     assert response.status_code == 303
     assert response.headers["X-Frame-Options"] == "DENY"
     assert response.headers["X-Content-Type-Options"] == "nosniff"
-    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert response.headers["Referrer-Policy"] == "same-origin"
     assert response.headers["Content-Security-Policy"] == "default-src 'self'"
     assert response.headers["Strict-Transport-Security"] == "max-age=31536000"
 
