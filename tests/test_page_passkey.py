@@ -165,6 +165,7 @@ def test_register_list_and_store_public_data_only() -> None:
     assert "Laptop" in page.text
     assert "2026-11-03" in page.text
     second = Authenticator()
+    env.clock.advance(60)  # Listed oldest first: the second passkey is created later.
     env.client.post(
         "/account/passkeys",
         data={"name": "Phone", "credential": second.register(env.registration_challenge())},
