@@ -20,6 +20,7 @@ store. Frozen dataclasses are stored and returned as they are.
 - `get_sync_token` gives `None` for an unknown calendar. `set_sync_token(cid, None)` clears it.
   `""` is stored as `""`.
 - `get_meta` gives `None` for an unknown key, else the last `set_meta` value.
+- `get_settings` and `get_auth` keep only the fields the dataclass has: there is no stored row to load, so old rows (`two_factor`, `failures`, `locked_until`) are a `PgStore` concern.
 - `get_secret` gives `None` for an unknown name. `set_secret(name, None)` deletes it. Values stay in
   memory only; there is no `SecretBox`, since encryption at rest belongs to the PostgreSQL store.
 
@@ -62,6 +63,14 @@ raises `StoreError`, and nothing is stored. Every read returns fresh copies of `
 `create_session(token_hash, expires)` inserts or replaces. `session_valid(token_hash, now)` is True
 only when the session exists and `expires > now`; `expires == now` is False and an unknown hash is
 False. It deletes nothing. `delete_session` of an unknown hash does nothing.
+
+## Passkeys and the Google link
+
+Keyed by `credential_id`. `add_passkey` stores the `Passkey`. `list_passkeys` gives the oldest
+`created` first, ties by `credential_id` in code-point order, as PostgreSQL does. `set_passkey_sign_count`
+replaces `sign_count` on that passkey and does nothing for an unknown id. `delete_passkey` of an
+unknown id does nothing. `get_google_link` gives `None` until `set_google_link(link)`;
+`set_google_link(None)` unlinks. Both are public data and are stored as given, not boxed.
 
 ## Errors
 

@@ -30,15 +30,15 @@ original error. Other exceptions are not caught.
    already in `schema_version`, execute that file's text with no parameters, then insert the file
    name.
 
-A second call sees `0001_init.sql` and applies nothing. `migrations/` has no `__init__.py`.
-`0001_init.sql` creates the tables below. `schema_version` itself is created by `migrate`, not by
+A second call sees `0001_init.sql` and `0002_signin.sql` and applies nothing. `migrations/` has no
+`__init__.py`. `0001_init.sql` creates the tables below, and `0002_signin.sql` adds `passkeys`. `schema_version` itself is created by `migrate`, not by
 that file.
 
 ## Tables
 
 | Table | Key | Role |
 |---|---|---|
-| `state` | `name` | One jsonb row each for `settings`, `alert_state`, `status`, `auth` |
+| `state` | `name` | One jsonb row each for `settings`, `alert_state`, `status`, `auth`, and `google_link` once an account is linked |
 | `rules` | `position` | Ordered rules. `save_rules` deletes every row, then inserts the list in order |
 | `calendars` | `id` | `position`, `summary`, `access_role`, `is_primary` (`primary` is reserved) |
 | `sync_tokens` | `calendar_id` | Sync token text. `set_sync_token(id, None)` deletes the row |
@@ -49,6 +49,7 @@ that file.
 | `secrets` | `name` | Ciphertext only (`token text NOT NULL`) |
 | `sessions` | `token_hash` | `expires timestamptz NOT NULL` |
 | `meta` | `key` | `value text NOT NULL`. A missing key reads `None` |
+| `passkeys` | `credential_id` | `name`, `public_key bytea`, `sign_count bigint`, `created timestamptz` (migration `0002_signin.sql`) |
 
 The closest existing construct to `meta` is the `state` table, also a keyed jsonb row store. `meta`
 is a separate key/value table because `state` rows are typed dataclass rows keyed by name
@@ -66,6 +67,13 @@ state.
 `params` and `result` for `req.id` and keeps the stored `created`, as `MemoryStore` does. When no
 row matches it raises `StoreError(f"unknown request {id}")`.
 
+`list_passkeys` orders by `created`, then `credential_id`. `add_passkey` inserts the row and
+`set_passkey_sign_count` updates `sign_count` for that id (no row: nothing happens). `delete_passkey`
+of an unknown id does nothing. `get_google_link` reads the `google_link` state row as a `GoogleLink`
+(`sub`, `email`) and gives `None` when the row is missing; `set_google_link(None)` deletes the row.
+A passkey holds the public key only, and the link holds the Google account id and e-mail, so
+neither is boxed.
+
 `session_valid(token_hash, now)` is true only when the row exists and `expires > now`.
 `create_session` inserts or replaces: a second call with the same hash replaces its expiry
 (`ON CONFLICT (token_hash) DO UPDATE`), as `MemoryStore` does.
@@ -73,7 +81,11 @@ row matches it raises `StoreError(f"unknown request {id}")`.
 ## jsonb encoding
 
 `state.data`, `notice_state.state`, `requests.params` and `requests.result` are bound with
-`psycopg.types.json.Jsonb`. A missing `state` row reads as the default: `Settings()`,
+`psycopg.types.json.Jsonb`. A stored `settings` row that still has `two_factor`, or lacks `signin_failure_limit` and
+`signin_lock_seconds`, loads: unknown keys are ignored and absent ones take the defaults (5 and 900).
+A stored `auth` row that still has `failures` or `locked_until` loads the same way; those fields no
+longer exist, and the sign-in lock lives in memory (see [signin_guard.md](signin_guard.md)).
+A missing `state` row reads as the default: `Settings()`,
 `AlertState()`, `Status()`, or `AuthRecord()`. The object has one key per dataclass field. A key
 that is absent on read takes that field's default. `Mapping` fields come back as `dict`.
 
@@ -82,8 +94,7 @@ Tuples are JSON arrays and are read back as tuples. `AuthRecord.password_hash` a
 
 Datetimes inside jsonb are `isoformat()` strings and are read with `datetime.fromisoformat`:
 
-- `AlertState.since`, `Status.last_good_sync` and `AuthRecord.locked_until` are
-  `"2026-11-02T15:00:00+00:00"` or JSON `null`.
+- `AlertState.since` and `Status.last_good_sync` are `"2026-11-02T15:00:00+00:00"` or JSON `null`.
 
 `allowed_hours` is not a bare array. Monday 09:00 through 17:00 is stored as:
 
@@ -105,7 +116,7 @@ The key is `str(weekday)` and each bound is `time.isoformat()`. On read, `int(ke
 On read, text that contains `T` becomes a `datetime` (`datetime.fromisoformat`); any other text
 becomes a `date`. NULL stays `None`.
 
-`placements.at`, `requests.created` and `sessions.expires` are `timestamptz`. Every one of those
+`placements.at`, `requests.created`, `sessions.expires` and `passkeys.created` are `timestamptz`. Every one of those
 values is converted with `.astimezone(UTC)` before it is returned. `placements.guest_domains` is
 `text[]`, read back as a tuple.
 

@@ -9,4 +9,5 @@
   <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
   <button type="submit">Sign in</button>
 </form>
+{% if google_linked %}{% include "signin_google.html" ignore missing %}{% endif %}
 {% endblock %}

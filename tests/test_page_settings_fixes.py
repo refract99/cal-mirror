@@ -31,6 +31,8 @@ VALID = {
     "allowed_hours_4": "",
     "allowed_hours_5": "",
     "allowed_hours_6": "",
+    "signin_failure_limit": "5",
+    "signin_lock_seconds": "900",
 }
 
 NTFY_URL = "ntfy server must be an http or https URL."
