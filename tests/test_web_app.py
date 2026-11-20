@@ -270,6 +270,18 @@ def test_main_custom_bind_and_port(monkeypatch, tmp_path):
     assert config.port == 9443
 
 
+def test_main_trusts_forwarded_headers_only_from_forwarded_allow_ips(monkeypatch, tmp_path):
+    _set_tls(monkeypatch, tmp_path)
+    monkeypatch.setenv("CAL_MIRROR_DSN", DSN)
+    monkeypatch.setenv("CAL_MIRROR_SECRET_KEY", generate_key())
+    monkeypatch.setenv("FORWARDED_ALLOW_IPS", "10.42.0.0/16")
+    runs, _stores = _patch_startup(monkeypatch)
+    app_module.main()
+    config = runs[0]
+    assert config.proxy_headers is True
+    assert config.forwarded_allow_ips == "10.42.0.0/16"
+
+
 def test_main_without_dsn(monkeypatch, tmp_path):
     _set_tls(monkeypatch, tmp_path)
     monkeypatch.delenv("CAL_MIRROR_DSN", raising=False)

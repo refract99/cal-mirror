@@ -1,4 +1,4 @@
-"""PRD-01 R3: the setup code reaches the web app in both deployments."""
+"""PRD-01 R3: the setup code reaches the web app in the compose deployment."""
 
 import re
 import shutil
@@ -37,24 +37,6 @@ def test_init_writes_a_fresh_random_setup_code(tmp_path: Path) -> None:
     assert re.fullmatch(r"[A-Za-z0-9_-]+", code)
     assert second.get("CAL_MIRROR_SETUP_CODE", "") not in ("", code)
     assert "CAL_MIRROR_SECRET_KEY" in first
-
-
-def env_entry(manifest: str, name: str) -> str:
-    """The lines of one `env:` entry of a manifest, from `- name: <name>` to the next entry."""
-    match = re.search(
-        rf"^(\s*)- name: {re.escape(name)}\s*$\n((?:\1  .*\n|\s*\n)*)", manifest, re.M
-    )
-    assert match is not None, name
-    return match.group(2)
-
-
-def test_k8s_web_reads_the_setup_code_from_the_secret() -> None:
-    entry = env_entry(
-        read(ROOT / "deploy" / "k8s" / "web-deployment.yaml"), "CAL_MIRROR_SETUP_CODE"
-    )
-    assert "secretKeyRef" in entry
-    assert re.search(r"name: cal-mirror-secrets\s*$", entry, re.M)
-    assert re.search(r"key: setup-code\s*$", entry, re.M)
 
 
 def web_service(compose: str) -> str:

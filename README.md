@@ -19,12 +19,12 @@ You need a Google Cloud OAuth client first: [docs/google-oauth.md](docs/google-o
 
 ## Kubernetes
 
-Two images and kustomize manifests (cert-manager TLS, network policies, an archive volume on a pinned node): [docs/install.md](docs/install.md). Images are published to `ghcr.io/refract99/cal-mirror-web` and `ghcr.io/refract99/cal-mirror-worker`.
+Two images; the cluster's own GitOps repository deploys them behind its ingress: [docs/install.md](docs/install.md). Images are published to `ghcr.io/refract99/cal-mirror-web` and `ghcr.io/refract99/cal-mirror-worker`.
 
 ## Scope and security
 
 - **One user and one Google account.** Only calendars you own are touched.
-- **LAN or VPN only.** The web app has password and TOTP sign-in with lockout, but it is not built to face the internet. Do not expose it.
+- **Public behind an ingress.** Sign-in needs a password and a second factor (TOTP or passkey) or a linked Google account, locks per client address, and refuses cross-origin form posts. Put it behind a TLS ingress and set `FORWARDED_ALLOW_IPS` to the ingress's addresses so the lock sees each visitor; see [docs/install.md](docs/install.md).
 - Tokens, passwords and 2FA secrets are encrypted at rest with a key you provide (`CAL_MIRROR_SECRET_KEY`). Back that key up: without it the stored Google token cannot be read.
 - Report vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
