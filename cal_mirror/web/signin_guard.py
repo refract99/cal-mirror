@@ -88,7 +88,8 @@ def _new_session(store: Store, now: datetime, response: Response) -> None:
 
 
 def client_address(request: Request) -> str:
-    """The connection's peer address (`request.client.host`); never a forwarded header."""
+    """The client address uvicorn gives (`request.client.host`): the peer, or the
+    `X-Forwarded-For` client when the peer is in `FORWARDED_ALLOW_IPS`."""
     return request.client.host if request.client else ""
 
 

@@ -17,7 +17,7 @@
 - [fake_google.md](fake_google.md): the in-memory Calendar API used by tests.
 - [google_api.md](google_api.md): the only module that talks to Google Calendar.
 - [google-oauth.md](google-oauth.md): creating the Google OAuth client the app needs.
-- [install.md](install.md): installing on k3s, and the environment the commands need.
+- [install.md](install.md): what a Kubernetes deployment of the two images needs.
 - [quickstart.md](quickstart.md): running the whole app on one machine with Docker Compose.
 - [page_archive.md](page_archive.md): the archive page.
 - [page_calendars.md](page_calendars.md): the calendars page.

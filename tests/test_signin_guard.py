@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import pyotp
 from fastapi.testclient import TestClient
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from cal_mirror.model import AuthRecord, Settings
 from cal_mirror.ports import FixedClock
@@ -112,3 +113,27 @@ def test_signin_elsewhere_does_not_lift_a_lock() -> None:
     assert env.password(A).status_code == 429
     env.complete(B)
     assert env.password(A).status_code == 429
+
+
+INGRESS = "10.42.0.17"
+
+
+def test_behind_a_trusted_ingress_the_lock_is_per_visitor() -> None:
+    """With the ingress in FORWARDED_ALLOW_IPS, uvicorn takes the client from X-Forwarded-For,
+    so one visitor's failures do not lock out another arriving through the same ingress."""
+    env = Env()
+    proxied = ProxyHeadersMiddleware(env.app, trusted_hosts="10.42.0.0/16")
+
+    def via_ingress(visitor: str):
+        return TestClient(
+            proxied,
+            base_url=ORIGIN,
+            headers={"Origin": ORIGIN, "X-Forwarded-For": visitor},
+            client=(INGRESS, 50000),
+            follow_redirects=False,
+        ).post("/signin", data={"password": WRONG})
+
+    for _ in range(5):
+        via_ingress(A)
+    assert via_ingress(A).status_code == 429
+    assert via_ingress(B).status_code == 401

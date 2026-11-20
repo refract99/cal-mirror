@@ -1,130 +1,77 @@
-# Install on k3s
+# Install on Kubernetes
 
-Everything below runs from your laptop with `kubectl` pointed at the k3s cluster.
-The build does not apply anything; you do.
+The repository ships two images, not manifests. A release tag `v<version>` makes CI publish
+`ghcr.io/refract99/cal-mirror-web:<version>` and `ghcr.io/refract99/cal-mirror-worker:<version>`.
+The cluster's own GitOps repository holds the deployment, the same way as the cluster's other
+apps; the owner's is `refract99/homelab`, folder `apps/cal-mirror`. The build applies nothing.
 
-## 1. Build and push the images
+## What the deployment holds
 
-```sh
-docker build -f Dockerfile.web -t <registry>/cal-mirror-web:<tag> .
-docker push <registry>/cal-mirror-web:<tag>
-docker build -f Dockerfile.worker -t <registry>/cal-mirror-worker:<tag> .
-docker push <registry>/cal-mirror-worker:<tag>
-```
+- **Web**: the web image, one replica, port `8443`, serving TLS itself (`CAL_MIRROR_TLS_CERT`,
+  `CAL_MIRROR_TLS_KEY`; a self-signed certificate is enough behind the ingress). Behind a Service on
+  port 443 and the cluster's ingress, which terminates the public TLS certificate and re-encrypts
+  to the pod without verifying it.
+- **Worker**: the worker image, one replica, `Recreate`, with the archive volume at `/archive`.
+  Archive destinations in the web app are paths under `/archive`.
+- **Postgres**, reachable by both through `CAL_MIRROR_DSN`, with `PGPASSWORD` from the secret.
+- **Secret** `cal-mirror-secrets`: `pg-password`, `secret-key` (Fernet key), `google-client.json`
+  (the OAuth client, see [google-oauth.md](google-oauth.md)), and optionally `setup-code`.
 
-Set the same registry and tag in `deploy/k8s/kustomization.yaml` (`images:`).
+Both containers run as uid 10001 with a read-only root file system and an `emptyDir` at `/tmp`.
 
-## 2. TLS
+## Environment
 
-Install cert-manager if it is absent. For DNS-01, create your own ClusterIssuer
-with the DNS provider token (the token lives in the cluster, never in this repo)
-and set `TLS_ISSUER_KIND=ClusterIssuer` and `TLS_ISSUER_NAME=<your issuer>`.
+| Variable | Pod | Value |
+| --- | --- | --- |
+| `CAL_MIRROR_DSN` | both | `host=<postgres> port=5432 dbname=cal_mirror user=cal_mirror` |
+| `PGPASSWORD` | both | secret key `pg-password` |
+| `CAL_MIRROR_SECRET_KEY` | both | secret key `secret-key` |
+| `CAL_MIRROR_GOOGLE_CLIENT` | both | path of the mounted `google-client.json` |
+| `CAL_MIRROR_OAUTH_REDIRECT` | web | `https://<host>/google/callback` |
+| `CAL_MIRROR_SIGNIN_REDIRECT` | web | `https://<host>/signin/google/callback` |
+| `CAL_MIRROR_SETUP_CODE` | web | secret key `setup-code`, optional |
+| `CAL_MIRROR_PORT`, `CAL_MIRROR_TLS_CERT`, `CAL_MIRROR_TLS_KEY` | web | `8443`, the pod's certificate and key |
+| `FORWARDED_ALLOW_IPS` | web | the ingress's address range, for k3s the pod network `10.42.0.0/16` |
 
-For self-signed, set `TLS_ISSUER_KIND=Issuer` and
-`TLS_ISSUER_NAME=cal-mirror-selfsigned` (shipped in the base).
+The Google OAuth client needs both redirect URIs: `https://<host>/google/callback` and
+`https://<host>/signin/google/callback`.
 
-## 3. Postgres
+`FORWARDED_ALLOW_IPS` is read by uvicorn: from those addresses it takes the client address from
+`X-Forwarded-For`. Without it every visitor reaches the app from the ingress's address, so the
+sign-in lock is one lock for everyone and a stranger's failures lock the owner out. The ingress
+must set `X-Forwarded-For` itself and not pass on a client's own; Traefik does this by default.
 
-On the Postgres server (existing or separate):
+## Setup code
 
-```sql
-CREATE ROLE cal_mirror LOGIN PASSWORD '<password>';
-CREATE DATABASE cal_mirror OWNER cal_mirror;
-```
-
-## 4. Namespace and secret
-
-```sh
-kubectl create namespace cal-mirror
-```
-
-Generate the Fernet key:
-
-```sh
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
-
-Generate the setup code, which the first-run page `/setup` asks for:
+On a fresh install the first-run page `/setup` asks for `CAL_MIRROR_SETUP_CODE`. Generate one with
 
 ```sh
 python -c "import secrets; print(secrets.token_urlsafe(24))"
 ```
 
-```sh
-kubectl -n cal-mirror create secret generic cal-mirror-secrets \
-  --from-literal=secret-key=<fernet key> \
-  --from-literal=pg-password=<password> \
-  --from-literal=setup-code=<setup code>
-```
-
-The setup code reaches the app as `CAL_MIRROR_SETUP_CODE`. Read it back with:
+and put it in the secret as `setup-code` (for a plain secret,
+`kubectl -n cal-mirror create secret generic cal-mirror-secrets --from-literal=setup-code=<code> ...`).
+Read it back with:
 
 ```sh
 kubectl -n cal-mirror get secret cal-mirror-secrets -o jsonpath='{.data.setup-code}' | base64 -d
 ```
 
-## 5. Archive folder
-
-On the node named by `USB_NODE`, prepare the folder at `ARCHIVE_HOST_PATH`
-owned by uid 10001:
-
-```sh
-sudo mkdir -p /var/lib/cal-mirror/archive
-sudo chown 10001 /var/lib/cal-mirror/archive
-```
-
-Archive destinations in the web app are paths under `/archive`.
-
-## 6. Settings, preview, apply
-
-Edit `deploy/k8s/settings.properties` (and `namespace`, registry and tag in
-`deploy/k8s/kustomization.yaml`), then:
-
-```sh
-kubectl kustomize deploy/k8s
-kubectl apply -k deploy/k8s
-kubectl -n cal-mirror get pods
-kubectl -n cal-mirror logs deploy/cal-mirror-worker
-```
-
-## Settings
-
-| Setting | Meaning |
-| --- | --- |
-| `HOST_NAME` | DNS name of the web app; goes into the certificate. |
-| `OAUTH_REDIRECT` | Google OAuth redirect URI, ending `/google/callback`. |
-| `SIGNIN_REDIRECT` | Google sign-in redirect URI, ending `/signin/google/callback`. |
-| `LAN_CIDR` | Network allowed to reach the web app. |
-| `VPN_CIDR` | VPN network allowed to reach the web app. |
-| `TLS_ISSUER_KIND` | `ClusterIssuer` (DNS-01) or `Issuer` (self-signed). |
-| `TLS_ISSUER_NAME` | Name of the issuer, or `cal-mirror-selfsigned`. |
-| `PG_NAMESPACE` | Namespace of the Postgres server; the network policies allow it. |
-| `PG_HOST` | Postgres host name. |
-| `PG_DB` | Postgres database name. |
-| `PG_USER` | Postgres user name. |
-| `USB_NODE` | Node that holds the USB drive; the worker is pinned to it. |
-| `ARCHIVE_HOST_PATH` | Folder on that node, mounted at `/archive` in the worker. |
-| `namespace` | Namespace for everything (`kustomization.yaml`). |
-| registry | `newName` of both images (`kustomization.yaml`). |
-| tag | `newTag` of both images (`kustomization.yaml`). |
-
-The Google OAuth client needs both redirect URIs: `https://<HOST_NAME>/google/callback`
-and `https://<HOST_NAME>/signin/google/callback`.
+Without it `/setup` answers 403, which is what an install that already has a password wants.
 
 ## Upgrade
 
-Set `newTag` of both images in `deploy/k8s/kustomization.yaml` to the release (it ships set to the release it came with), then `kubectl apply -k deploy/k8s`.
+Set both images to the new release in the GitOps repository and let it apply. The database
+migrates itself when the web app starts.
 
 From 0.1.x to 0.2.0:
 
-- Add `SIGNIN_REDIRECT` to your `settings.properties` (`https://<HOST_NAME>/signin/google/callback`) and add that URI to the Google OAuth client.
-- `setup-code` in `cal-mirror-secrets` is optional: without it `/setup` answers 403, which is what an install that already has a password wants.
-- A second factor is now required: if you have no TOTP or passkey, the next sign-in takes you to `/account/2fa` to enrol one.
+- Add `CAL_MIRROR_SIGNIN_REDIRECT` and `FORWARDED_ALLOW_IPS` to the web pod, and add the sign-in
+  redirect URI to the Google OAuth client.
+- A second factor is now required: if you have no TOTP or passkey, the next sign-in takes you to
+  `/account/2fa` to enrol one.
 
 ## Certificate renewal
 
-The web pod restarts itself within a minute of the renewed certificate reaching the pod, with no command to run.
-
-## Accepted gaps
-
-egress HTTPS is open to all addresses because a NetworkPolicy cannot filter by host name.
+The web pod restarts itself within a minute of a renewed pod certificate reaching it, with no
+command to run.

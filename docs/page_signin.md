@@ -64,8 +64,9 @@ or at least one passkey is registered (`signin_guard.second_factor_enrolled`).
 
 ## Lock rule
 
-Lock state is kept per client address, the connection's peer address (`request.client.host`).
-Forwarded headers are never read. Wrong passwords, wrong second-factor codes, bad passkeys and
+Lock state is kept per client address (`request.client.host`): the connection's peer, or, when
+the peer is a proxy listed in `FORWARDED_ALLOW_IPS`, the client its `X-Forwarded-For` names
+(uvicorn does this; the app reads no forwarded header itself). Wrong passwords, wrong second-factor codes, bad passkeys and
 refused Google sign-ins all count against the same address.
 
 - The limits are `Settings.signin_failure_limit` (default 5) and `Settings.signin_lock_seconds`

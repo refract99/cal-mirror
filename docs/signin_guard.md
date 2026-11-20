@@ -20,7 +20,9 @@ The session lives `SESSION_SECONDS = 43200` and the pending sign-in `PENDING_SEC
 
 ## Functions
 
-- `client_address(request) -> str`: `request.client.host`. Forwarded headers are never read.
+- `client_address(request) -> str`: `request.client.host`. That is the peer address, unless the
+  peer is a proxy listed in uvicorn's `FORWARDED_ALLOW_IPS`; then uvicorn has already replaced it
+  with the client named in `X-Forwarded-For`. The app reads no forwarded header itself.
 - `is_locked(request) -> bool`: true while this address is locked, by the app clock. Every
   sign-in route calls it first; locked means `429` `LOCK_MESSAGE`, credentials unchecked, no
   cookie set.

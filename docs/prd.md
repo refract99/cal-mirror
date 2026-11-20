@@ -12,7 +12,7 @@ A booking assistant sees every commitment I have, because each event on my secon
 
 ## Users
 
-- **The owner:** the only user. He signs in to the web app over the LAN or VPN to connect Google, pick calendars, write rules, change settings and start archive and cleanup. He gets ntfy messages only for things he must resolve: an app failure or a failed meeting check.
+- **The owner:** the only user. He signs in to the web app at its public address to connect Google, pick calendars, write rules, change settings and start archive and cleanup. He gets ntfy messages only for things he must resolve: an app failure or a failed meeting check.
 - **Booking assistant:** reads and books on the main calendar only. It never talks to cal-mirror.
 - **Event organizers and guests:** must not see any effect of cal-mirror. They get no email from it.
 
@@ -83,8 +83,8 @@ A booking assistant sees every commitment I have, because each event on my secon
 - Do not touch a calendar the owner does not own. Do not support a second Google account or a second user.
 - Do not let the web app read or write calendar events.
 - Do not write the OAuth token, password, TOTP secret or recovery codes in plain text, in logs or in alerts. Do not put event titles or details in alerts.
-- Do not expose the web app to the public internet.
-- Do not apply manifests or create cluster resources from the build. The owner applies them.
+- Do not expose the web app to the public internet except behind the cluster's ingress, with the sign-in hardening of v2 row 1 (required second factor, per-address lock, setup code, Origin check) and the real client address passed through (`FORWARDED_ALLOW_IPS`).
+- Do not apply manifests or create cluster resources from the build. The owner's cluster GitOps repository deploys the released images.
 - Do not call the live Google API in tests. Tests use a fake Calendar API.
 
 ## Acceptance criteria
@@ -111,7 +111,7 @@ A booking assistant sees every commitment I have, because each event on my secon
 - Secrets in the database are encrypted with a key from a k8s Secret.
 - Google OAuth: the Cloud app is set to "In production" without verification. In "Testing" the refresh token expires after 7 days. The redirect URI must be HTTPS on a host whose domain is on the public suffix list. Google does not need to reach the host, so a LAN-only name under a public domain works.
 - The worker's pod must reach the archive destination. A USB drive pins the worker to the node that has the drive.
-- Outbound: Google APIs and the ntfy server only, plus Let's Encrypt and the DNS provider's API if cert-manager is used. Inbound: the web app, from hosts on the owner's network and VPN only.
+- Outbound: Google APIs and the ntfy server only, plus Let's Encrypt and the DNS provider's API if cert-manager is used. Inbound: the web app, through the cluster's ingress.
 
 ## Open questions
 

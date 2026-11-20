@@ -77,7 +77,7 @@ Each writes its module, its tests in a **new** file `tests/test_<module>.py`, an
 | D4 | page_rules | `cal_mirror/web/page_rules.py`, `cal_mirror/web/templates/rules*.html` | A | `router` | `C tests/test_page_rules.py` |
 | D5 | page_archive | `cal_mirror/web/page_archive.py`, `cal_mirror/web/templates/archive*.html` | A | `router` | `C tests/test_page_archive.py` |
 | D6 | page_status | `cal_mirror/web/page_status.py`, `cal_mirror/web/templates/status*.html` | A | `router` | `C tests/test_page_status.py` |
-| P | packaging | `Dockerfile.web`, `Dockerfile.worker`, `deploy/k8s/`, `.dockerignore`, `docs/install.md` | A | none | `C tests/test_packaging.py` |
+| P | packaging | `Dockerfile.web`, `Dockerfile.worker`, `.dockerignore`, `docs/install.md` | A | none | `C tests/test_packaging.py` |
 | E1 | worker | `cal_mirror/worker.py` and new helper modules it names | B1–B8, C1–C5 | `run_once(store, calendar, notifier, clock)`, `process_requests(...)`, `main()` | `C tests/test_worker*.py` |
 | E2 | web app | `cal_mirror/web/app.py` | D1–D6, C1, C3 | `create_app(store, clock=None)`, `main()` | `C tests/test_web_app.py` |
 | F | acceptance | `tests/test_acceptance_*.py`, `docs/README.md` | E1, E2 | none | `/bin/sh scripts/gate.sh` |
@@ -86,7 +86,7 @@ Web routes, fixed so pages link to each other without importing each other: `/si
 
 Request flow: D4 writes a `REQ_RULES` request with the proposed rules and never saves rules itself; the worker counts the future copies that would move (`count_moves`), sets `result = {"moves": n}` and `REQ_READY`; D4 shows the warning and on confirm sets `REQ_CONFIRMED` (cancel: `REQ_CANCELLED`, nothing else); the worker then saves the rules and applies `plan_moves`. D5 does the same for `REQ_ARCHIVE`: the worker writes the archive, runs `plan_cleanup` and `verify_archive`, sets `result = {"counts": {"<calendar>/<year>": n}, "check": "ok" | "failed"}`; deletes happen only after `REQ_CONFIRMED` and a passed check.
 
-**Environment** (read only in `main()` functions and `get_flow`, never at import): `CAL_MIRROR_DSN` (Postgres), `CAL_MIRROR_SECRET_KEY` (Fernet key, C3), `CAL_MIRROR_GOOGLE_CLIENT` (path to the OAuth client JSON), `CAL_MIRROR_OAUTH_REDIRECT` (HTTPS redirect URI ending `/google/callback`), `CAL_MIRROR_SIGNIN_REDIRECT` (optional; the Sign in with Google redirect URI, default `<base URL>/signin/google/callback`), `CAL_MIRROR_SETUP_CODE` (deployment secret, read per request by `/setup`; unset or empty means `/setup` answers 403), `CAL_MIRROR_TLS_CERT`, `CAL_MIRROR_TLS_KEY`, `CAL_MIRROR_BIND` (default `0.0.0.0`), `CAL_MIRROR_PORT` (default `8443`). Entry points: `python -m cal_mirror.worker` and `python -m cal_mirror.web.app`.
+**Environment** (read only in `main()` functions and `get_flow`, never at import): `CAL_MIRROR_DSN` (Postgres), `CAL_MIRROR_SECRET_KEY` (Fernet key, C3), `CAL_MIRROR_GOOGLE_CLIENT` (path to the OAuth client JSON), `CAL_MIRROR_OAUTH_REDIRECT` (HTTPS redirect URI ending `/google/callback`), `CAL_MIRROR_SIGNIN_REDIRECT` (optional; the Sign in with Google redirect URI, default `<base URL>/signin/google/callback`), `CAL_MIRROR_SETUP_CODE` (deployment secret, read per request by `/setup`; unset or empty means `/setup` answers 403), `CAL_MIRROR_TLS_CERT`, `CAL_MIRROR_TLS_KEY`, `CAL_MIRROR_BIND` (default `0.0.0.0`), `CAL_MIRROR_PORT` (default `8443`). uvicorn's own `FORWARDED_ALLOW_IPS` (default `127.0.0.1,::1`) names the proxies whose `X-Forwarded-For` sets the client address; behind an ingress it is the ingress's address range. Entry points: `python -m cal_mirror.worker` and `python -m cal_mirror.web.app`.
 
 **Recurring exceptions.** Google lists a changed or cancelled instance of a series as its own item with `recurring_event_id` set and id `<series id>_<suffix>`. A mirror of such an instance is the same instance of the mirror series: event id `<mirror series id>_<suffix>` (the text after the first `_` of the source id), written with `OP_UPDATE` or `OP_DELETE` on that id; it gets its own `Link` keyed by its own source key.
 
@@ -114,7 +114,7 @@ Libraries added to the PRD's list with the owner's yes 2026-10-24 (decision 3): 
 ## Not built
 
 - Criterion 13 (a week on the owner's account) and 14 (manifests applied on k3s): the owner's review after install.
-- The PRD's install-time questions (TLS provider, registry, Postgres server, USB node): manifest settings, answered at install.
+- The PRD's install-time questions (TLS provider, registry, Postgres server, archive volume): answered by the cluster's GitOps repository, which holds the deployment.
 
 ## Open items
 

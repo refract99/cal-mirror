@@ -16,3 +16,9 @@ def test_install_names_the_signin_redirect_uri() -> None:
     install = (DOCS / "install.md").read_text(encoding="utf-8")
     assert "/signin/google/callback" in install
     assert "/google/callback" in install
+
+
+def test_install_passes_the_client_address_through_the_ingress() -> None:
+    install = (DOCS / "install.md").read_text(encoding="utf-8")
+    assert "FORWARDED_ALLOW_IPS" in install
+    assert "X-Forwarded-For" in install
