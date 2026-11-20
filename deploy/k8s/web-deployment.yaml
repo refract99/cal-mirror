@@ -71,6 +71,7 @@ spec:
                 secretKeyRef:
                   name: cal-mirror-secrets
                   key: setup-code
+                  optional: true
             - name: CAL_MIRROR_PORT
               value: "8443"
             - name: CAL_MIRROR_TLS_CERT

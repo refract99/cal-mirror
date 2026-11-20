@@ -12,10 +12,10 @@ resources:
 images:
   - name: cal-mirror-web
     newName: ghcr.io/refract99/cal-mirror-web
-    newTag: 0.1.0
+    newTag: 0.2.0
   - name: cal-mirror-worker
     newName: ghcr.io/refract99/cal-mirror-worker
-    newTag: 0.1.0
+    newTag: 0.2.0
 configMapGenerator:
   - name: cal-mirror-settings
     envs:
