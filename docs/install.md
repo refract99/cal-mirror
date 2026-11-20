@@ -111,6 +111,16 @@ kubectl -n cal-mirror logs deploy/cal-mirror-worker
 The Google OAuth client needs both redirect URIs: `https://<HOST_NAME>/google/callback`
 and `https://<HOST_NAME>/signin/google/callback`.
 
+## Upgrade
+
+Set `newTag` of both images in `deploy/k8s/kustomization.yaml` to the release (it ships set to the release it came with), then `kubectl apply -k deploy/k8s`.
+
+From 0.1.x to 0.2.0:
+
+- Add `SIGNIN_REDIRECT` to your `settings.properties` (`https://<HOST_NAME>/signin/google/callback`) and add that URI to the Google OAuth client.
+- `setup-code` in `cal-mirror-secrets` is optional: without it `/setup` answers 403, which is what an install that already has a password wants.
+- A second factor is now required: if you have no TOTP or passkey, the next sign-in takes you to `/account/2fa` to enrol one.
+
 ## Certificate renewal
 
 The web pod restarts itself within a minute of the renewed certificate reaching the pod, with no command to run.
